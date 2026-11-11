@@ -39,6 +39,8 @@
   .train-info { left: 50%; right: auto; transform: translateX(-50%); width: max-content; max-width: calc(100% - 24px);
     background: rgba(15, 17, 21, 0.82); border-radius: 12px; padding: 6px 14px; }
   .train-info .bio-age { font-size: 18px; }
+  .zoom-btn { position: absolute; right: 10px; bottom: 54px; z-index: 1; background: rgba(15, 17, 21, 0.85); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
   .train-info .bio-text { font-size: 13px; }
   .bio.pop { animation: pop .5s ease-out; }
   @keyframes pop { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
@@ -111,6 +113,7 @@
         <div class="bio" id="bio"><div class="bio-age" id="bioAge"></div><div class="bio-text" id="bioText"></div></div>
       </div>
       <div class="scene"><canvas id="cv-train"></canvas>
+        <button class="zoom-btn" id="trainZoom"></button>
         <div class="bio train-info" id="trainInfo"><div class="bio-age" id="trainTop"></div><div class="bio-text" id="trainSub"></div></div>
       </div>
     </div>
@@ -139,7 +142,7 @@ const load = () => { try { return JSON.parse(localStorage.getItem('workTimer')) 
 const save = () => { try { localStorage.setItem('workTimer', JSON.stringify(state)); } catch {} };
 
 const saved = load();
-const state = { start: saved.start || '10:00', end: saved.end || '19:00', scene: saved.scene || 0 };
+const state = { start: saved.start || '10:00', end: saved.end || '19:00', scene: saved.scene || 0, trainZoom: saved.trainZoom || 0 };
 
 // Общее для всех сцен: день делится на N частей, k — сколько частей уже прошло.
 const N = 300;
@@ -1018,6 +1021,15 @@ const BIOMES = [[0, 'Центральная Россия', '#1d3324'], [1450, '�
 const biomeAt = km => BIOMES.filter(b => km >= b[0]).pop();
 const BAIKAL = [5255, 5560], SEA = 9240;
 const train = { geo: null, shown: '' };
+// масштаб: насколько отдалена камера
+const TRAIN_ZOOMS = [[1, 'близко'], [0.5, 'дальше'], [0.22, 'далеко']];
+let trainZoom = Math.min(TRAIN_ZOOMS.length - 1, Math.max(0, state.trainZoom | 0));
+function setTrainZoom(i) {
+  trainZoom = i; state.trainZoom = i; save();
+  $('trainZoom').textContent = '🔍 ' + TRAIN_ZOOMS[i][1];
+}
+$('trainZoom').onclick = () => setTrainZoom((trainZoom + 1) % TRAIN_ZOOMS.length);
+setTrainZoom(trainZoom);
 
 function trainGeometry() {
   const W = area.clientWidth, H = area.clientHeight;
@@ -1051,20 +1063,22 @@ function updateTrain() {
 function trainFrame(now) {
   const g = train.geo; if (!g) return;
   beginFrame(trainCvs, g);
-  const { W, H, VL, VW, port } = g;
+  const { W, H, port } = g, z = TRAIN_ZOOMS[trainZoom][0];
+  const VL = g.VL / z, VW = g.VW / z;                               // видимая область в мировых пикселях
   const km = livePct() / 100 * TOTAL_KM;
   const ppk = Math.max(3, 25 * dayLenMs() / 1000 / TOTAL_KM);      // пикселей на км: ~25 px/с при обычной скорости
-  const gap = Math.max(10, VW * 0.032), c = VW * 0.5, tA = c - gap, tB = c + gap;   // наш путь A, встречный B
-  const strip = 44, headU = strip + (VL - strip) * 0.58, off = km * ppk - headU;
+  const gap = Math.max(10, g.VW * 0.032), c = VW * 0.5, tA = c - gap, tB = c + gap;   // наш путь A, встречный B
+  const strip = 44, headU = (strip + (g.VL - strip) * 0.58) / z, off = km * ppk - headU;
   const U = kmv => kmv * ppk - off;                                 // км → координата вдоль пути на экране
-  const toScreen = (u, v) => port ? [v, H - u] : [u, v];
+  const toScreen = (u, v) => port ? [v * z, H - u * z] : [u * z, v * z];
 
   ctx.save();
   if (port) { ctx.translate(0, H); ctx.rotate(-Math.PI / 2); }
+  ctx.scale(z, z);
 
   // земля по биомам
   const TS = 48, t0 = Math.floor(off / TS), t1 = Math.ceil((off + VL) / TS);
-  for (let t = t0; t <= t1; t++) { ctx.fillStyle = biomeAt(Math.max(0, t * TS / ppk))[2]; ctx.fillRect(t * TS - off, 0, TS + 1, VW); }
+  for (let t = t0; t <= t1; t++) { ctx.fillStyle = biomeAt(Math.max(0, t * TS / ppk))[2]; ctx.fillRect(t * TS - off - 1, 0, TS + 2, VW); }
 
   // Байкал и море — вода с одной стороны
   const water = (k0, k1) => {
@@ -1092,7 +1106,7 @@ function trainFrame(now) {
   for (let t = t0; t <= t1; t++) {
     const kmT = t * TS / ppk; if (kmT < -2) continue;
     const r = rng(t * 7919 + 13), b = biomeAt(Math.max(0, kmT))[1];
-    const n = b === 'тайга' ? 9 : b === 'Забайкалье' ? 3 : 6;
+    const n = Math.round((b === 'тайга' ? 9 : b === 'Забайкалье' ? 3 : 6) / z);
     for (let i = 0; i < n; i++) {
       const u = t * TS + r() * TS - off, v = r() * VW, kind = r(), sz = 0.6 + r() * 0.6;
       if (Math.abs(v - c) < gap * 2.3 || busy(kmT, u) || inWater(kmT, v)) continue;
@@ -1123,7 +1137,7 @@ function trainFrame(now) {
     const r = rng(si * 31 + 5);
     if (s[3] > 0) {   // кварталы
       for (let i = 0; i < 14 * s[3] * s[3]; i++) {
-        const bu = u + (r() - 0.5) * spread * 1.8, side = r() < 0.5 ? -1 : 1, bv = c + side * (gap * 3 + 14 + r() * (VW / 2 - gap * 3 - 20));
+        const bu = u + (r() - 0.5) * spread * 1.8, side = r() < 0.5 ? -1 : 1, bv = c + side * (gap * 3 + 14 + r() * (g.VW / 2 - gap * 3 - 20));
         if (inWater(s[1], bv)) continue;
         const bw = 14 + r() * 26, bh = 10 + r() * 20;
         ctx.fillStyle = ['#5d6470', '#6f7682', '#7a5a4a', '#4f5865'][i % 4]; ctx.fillRect(bu - bw / 2, bv - bh / 2, bw, bh);
@@ -1158,7 +1172,7 @@ function trainFrame(now) {
   if (U(SEA) < VL) labels.push([Math.min(VL - 40, U(SEA) + 120), VW * 0.15, 'Японское море', -1]);
 
   // вагон сверху: (u — перед вагона), len, цвет
-  const cw = gap * 1.35, carL = Math.min(cw * 5.2, VL * 0.13);
+  const cw = gap * 1.35, carL = Math.min(cw * 5.2, g.VL * 0.13);
   const car = (u, tv, len, body, roof, front) => {
     ctx.fillStyle = body; ctx.beginPath(); ctx.roundRect(u - len, tv - cw / 2, len, cw, front ? [cw * 0.6, 3, 3, cw * 0.6].reverse() : 3); ctx.fill();
     ctx.fillStyle = roof; ctx.fillRect(u - len + 4, tv - cw * 0.22, len - 8 - (front ? cw * 0.3 : 0), cw * 0.44);
@@ -1178,7 +1192,7 @@ function trainFrame(now) {
   // наш поезд «Россия»: красный локомотив и серо-красные вагоны
   car(headU, tA, carL * 0.85, '#c8352e', '#8e2620', true);
   ctx.fillStyle = '#ffe9a8'; ctx.beginPath(); ctx.arc(headU - 2, tA - cw * 0.28, 1.6, 0, 7); ctx.arc(headU - 2, tA + cw * 0.28, 1.6, 0, 7); ctx.fill();
-  for (let i = 0, u = headU - carL * 0.85 - 3; u > 6; i++, u -= carL + 3) {
+  for (let i = 0, u = headU - carL * 0.85 - 3; i < 16 && u > -carL; i++, u -= carL + 3) {
     car(u, tA, carL, '#8d96a6', '#6d7686');
     ctx.fillStyle = '#c8352e'; ctx.fillRect(u - carL, tA - cw / 2, carL, 2); ctx.fillRect(u - carL, tA + cw / 2 - 2, carL, 2);
     ctx.fillStyle = '#5a616e'; for (let j = 1; j < 4; j++) ctx.fillRect(u - carL + carL * j / 4 - 2, tA - 2, 4, 4);   // вентиляция
@@ -1190,7 +1204,7 @@ function trainFrame(now) {
   for (const [u, v, text, size] of labels) {
     if (u < 10 || u > VL - 10) continue;
     const [x, y] = toScreen(u, v);
-    if (port && y > H - strip - 8) continue;
+    if (y > H - strip - 8) continue;
     ctx.font = size < 0 ? 'italic 11px -apple-system, sans-serif' : `600 ${size === 2 ? 13 : 11}px -apple-system, sans-serif`;
     const w = ctx.measureText(text).width + 10;
     const lx = Math.max(w / 2 + 2, Math.min(W - w / 2 - 2, x)), ly = Math.max(10, Math.min(H - strip - 10, y));
