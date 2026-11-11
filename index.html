@@ -15,9 +15,8 @@
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
     padding: 16px;
   }
-  .app { height: calc(100vh - 32px); display: flex; flex-direction: column; gap: 12px; }
-  .cards { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; }
-  @media (max-width: 700px) { .cards { grid-template-columns: 1fr; } }
+  .app { height: calc(100vh - 32px); height: calc(100dvh - 32px); display: flex; flex-direction: column; gap: 12px; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .grid-wrap { flex: 1; min-height: 160px; position: relative; }
   #grid { position: absolute; inset: 0; width: 100%; height: 100%; }
   .card {
@@ -30,10 +29,6 @@
   .percent { font-size: 48px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .sub { color: var(--muted); font-size: 13px; margin-top: 4px; text-align: center; line-height: 1.5; }
   .sub b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
-  svg { width: 110px; height: 110px; transform: rotate(-90deg); }
-  .ring-track { stroke: var(--track); }
-  .ring { stroke: var(--accent); transition: stroke-dashoffset .1s linear, stroke .3s; }
-  .ring.full { stroke: var(--done); }
 
   .panel {
     background: var(--card); border: 1px solid var(--border); border-radius: 16px;
@@ -48,30 +43,22 @@
   .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .hidden { display: none !important; }
 
-  /* Крестики-нолики */
-  .game { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px 0; }
-  .score { display: flex; gap: 24px; color: var(--muted); font-size: 14px; }
-  .score b { color: var(--text); font-variant-numeric: tabular-nums; margin-left: 6px; }
-  .board-wrap { position: relative; }
-  .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: var(--border); border-radius: 14px; padding: 6px; }
-  .cell {
-    background: var(--card); border: 0; border-radius: 9px; cursor: pointer; aspect-ratio: 1;
-    font-weight: 700; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0;
+  /* Телефон */
+  @media (max-width: 700px) {
+    body { padding: 10px; }
+    .app { height: calc(100vh - 20px); height: calc(100dvh - 20px); gap: 8px; }
+    .cards { gap: 8px; }
+    .card { padding: 10px 8px; border-radius: 12px; }
+    .label { font-size: 10px; margin-bottom: 2px; }
+    .timer { font-size: 28px; }
+    .percent { font-size: 28px; }
+    .sub { font-size: 11px; line-height: 1.4; }
+    .panel { padding: 8px 10px; gap: 8px; border-radius: 12px; }
+    .field { font-size: 13px; gap: 6px; }
+    input[type=time] { font-size: 14px; padding: 4px 6px; }
+    #leave { width: 100%; margin-left: 0 !important; padding: 10px; font-size: 15px; }
   }
-  .cell:disabled { cursor: default; }
-  .cell.x { color: var(--accent); }
-  .cell.o { color: #e9c27a; }
-  .cell.win { background: #23324a; }
-  .result {
-    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    background: rgba(15, 17, 21, 0.85); border-radius: 14px; font-size: 26px; font-weight: 700;
-    opacity: 0; pointer-events: none; transition: opacity .25s; text-align: center; padding: 12px;
-  }
-  .result.show { opacity: 1; }
-  .hint { color: var(--muted); font-size: 13px; }
-  .games { display: flex; flex-wrap: wrap; gap: 48px; justify-content: center; align-items: flex-start; width: 100%; }
-  .game-col { display: flex; flex-direction: column; align-items: center; gap: 16px; }
-  #snake { display: block; width: 100%; aspect-ratio: 1; background: var(--card); border: 6px solid var(--border); border-radius: 14px; }
+
 </style>
 </head>
 <body>
@@ -81,12 +68,6 @@
       <div class="label">Осталось</div>
       <div class="timer" id="timer">00:00:00</div>
       <div class="sub" id="timerSub"></div>
-    </div>
-    <div class="card">
-      <svg viewBox="0 0 120 120">
-        <circle class="ring-track" cx="60" cy="60" r="52" fill="none" stroke-width="12"/>
-        <circle class="ring" id="ring" cx="60" cy="60" r="52" fill="none" stroke-width="12" stroke-linecap="round"/>
-      </svg>
     </div>
     <div class="card">
       <div class="label">Прошло</div>
@@ -106,36 +87,9 @@
   </div>
 </div>
 
-<section class="game">
-  <div class="games">
-    <div class="game-col">
-      <div class="score">
-        <span>Ты<b id="sX">0</b></span><span>Ничьи<b id="sD">0</b></span><span>Компьютер<b id="sO">0</b></span>
-      </div>
-      <div class="board-wrap" id="boardWrap">
-        <div class="board" id="board"></div>
-        <div class="result" id="result"></div>
-      </div>
-      <div class="hint">Ты ходишь крестиками</div>
-    </div>
-    <div class="game-col">
-      <div class="score">
-        <span>Счёт<b id="snScore">0</b></span><span>Рекорд<b id="snBest">0</b></span>
-      </div>
-      <div class="board-wrap" id="snakeWrap">
-        <canvas id="snake"></canvas>
-        <div class="result" id="snResult"></div>
-      </div>
-      <div class="hint">Управление стрелками, старт — любой стрелкой</div>
-    </div>
-  </div>
-</section>
-
 <script>
 const $ = id => document.getElementById(id);
 
-const R = 52, C = 2 * Math.PI * R;
-$('ring').style.strokeDasharray = C;
 
 const load = () => { try { return JSON.parse(localStorage.getItem('workTimer')) || {}; } catch { return {}; } };
 const save = () => { try { localStorage.setItem('workTimer', JSON.stringify(state)); } catch {} };
@@ -155,9 +109,17 @@ const crowd = { geo: null, k: -1, dead: 0, shots: [], aim: 0 };
 function crowdGeometry() {
   const W = $('gridWrap').clientWidth, H = $('gridWrap').clientHeight;
   if (!W || !H) return null;
-  const S = Math.min(H * 0.42, W * 0.12);           // рост стрелка
-  const sx = Math.max(S * 0.6, W * 0.07), sy = H / 2 + S / 2;
-  const x0 = sx + S * 1.6, x1 = W - 8, y0 = 8, y1 = H - 8;
+  let S, sx, sy, x0, x1, y0, y1;
+  if (H > W * 1.05) {
+    // вертикальный экран (телефон): стрелок внизу по центру, толпа над ним на всю ширину
+    S = Math.min(W * 0.2, H * 0.16);
+    sx = W / 2; sy = H - 4;
+    x0 = 4; x1 = W - 4; y0 = 4; y1 = H - S * 1.3;
+  } else {
+    S = Math.min(H * 0.42, W * 0.12);              // рост стрелка
+    sx = Math.max(S * 0.6, W * 0.07); sy = H / 2 + S / 2;
+    x0 = sx + S * 1.6; x1 = W - 8; y0 = 8; y1 = H - 8;
+  }
   const aw = x1 - x0, ah = y1 - y0;
   const [cols, rows] = [[6, 50], [10, 30], [12, 25], [15, 20], [20, 15], [25, 12], [30, 10], [50, 6], [60, 5]].reduce((a, b) =>
     Math.abs(Math.log(b[0] / b[1] * ah / aw)) < Math.abs(Math.log(a[0] / a[1] * ah / aw)) ? b : a);
@@ -169,43 +131,96 @@ function crowdGeometry() {
   return { W, H, S, sx, sy, s, people };
 }
 
-// Палочный человечек: (x, y) — ноги, a — угол падения (0 стоит, π/2 лежит)
-function figure(x, y, s, a, color, lw) {
+// Особые человечки: каждый 10-й — в шляпе, а тот, на котором заканчивается очередной час, — большой и толстый
+const isHat = r => (r + 1) % 10 === 0;
+function isFat(r) {
+  const hours = dayLenMs() / 3600000;
+  return Math.floor((r + 1) * hours / N + 1e-9) > Math.floor(r * hours / N + 1e-9);
+}
+const kindOf = r => isFat(r) ? 'fat' : isHat(r) ? 'hat' : 'norm';
+// Подготовка к особому выстрелу (мс): на колено — по шляпе, оптика — по толстому
+const PREP = { hat: 700, fat: 1500 }, HOLD = 450, BACK = 400;
+const fallTime = s => T_FALL * (s.kind === 'fat' ? 1.6 : 1);
+
+// Палочный человечек: (x, y) — ноги, a — угол падения (0 стоит, π/2 лежит), rank — его номер в очереди
+function figure(x, y, s, a, color, lw, rank) {
+  const fat = rank != null && isFat(rank), hat = rank != null && isHat(rank);
+  const z = fat ? s * 1.3 : s, aw = fat ? 0.26 : 0.2;
   ctx.save();
-  ctx.translate(x - s * 0.45 * Math.sin(a), y); ctx.rotate(a);
-  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lw || Math.max(1.5, s * 0.08);
+  ctx.translate(x - z * 0.45 * Math.sin(a), y); ctx.rotate(a);
+  ctx.strokeStyle = color; ctx.fillStyle = color;
+  ctx.lineWidth = (lw || Math.max(1.5, s * 0.08)) * (fat ? 1.8 : 1);
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.moveTo(-s * 0.16, 0); ctx.lineTo(0, -s * 0.42); ctx.lineTo(s * 0.16, 0);      // ноги
-  ctx.moveTo(0, -s * 0.42); ctx.lineTo(0, -s * 0.74);                                // туловище
-  ctx.moveTo(-s * 0.2, -s * 0.5); ctx.lineTo(0, -s * 0.68); ctx.lineTo(s * 0.2, -s * 0.5); // руки
+  ctx.moveTo(-z * 0.16, 0); ctx.lineTo(0, -z * 0.42); ctx.lineTo(z * 0.16, 0);          // ноги
+  ctx.moveTo(0, -z * 0.42); ctx.lineTo(0, -z * 0.74);                                    // туловище
+  ctx.moveTo(-z * aw, -z * 0.5); ctx.lineTo(0, -z * 0.68); ctx.lineTo(z * aw, -z * 0.5); // руки
   ctx.stroke();
-  ctx.beginPath(); ctx.arc(0, -s * 0.86, s * 0.12, 0, 7); ctx.fill();               // голова
+  if (fat) { ctx.beginPath(); ctx.ellipse(0, -z * 0.57, z * 0.17, z * 0.2, 0, 0, 7); ctx.fill(); } // пузо
+  ctx.beginPath(); ctx.arc(0, -z * 0.86, z * (fat ? 0.13 : 0.12), 0, 7); ctx.fill();               // голова
+  if (hat) {
+    ctx.fillStyle = '#b07a4a';
+    ctx.fillRect(-z * 0.21, -z * 0.98, z * 0.42, z * 0.05);                                       // поля
+    ctx.beginPath(); ctx.roundRect(-z * 0.11, -z * 1.16, z * 0.22, z * 0.2, z * 0.03); ctx.fill(); // тулья
+  }
   ctx.restore();
 }
 
-function drawShooter(g, angle, flash) {
-  const { S, sx, sy } = g, lw = Math.max(2.5, S * 0.06);
+// Стрелок с винтовкой. pose: kneel — на колене, scope — смотрит в оптику, recoil — отдача (всё 0..1)
+function shooterJoints(g, pose) {
+  const { S, sx, sy } = g, k = pose.kneel, sc = pose.scope;
+  const L = (a, b) => a + (b - a) * k;
+  const hipY = L(sy - S * 0.42, sy - S * 0.26), dy = hipY - (sy - S * 0.42);
+  return {
+    L, hipY, dy,
+    neck: [sx + S * 0.03 * sc, sy - S * 0.74 + dy],
+    head: [sx + S * 0.07 * sc, sy - S * 0.86 + dy - S * 0.01 * sc],
+    shoulder: [sx + S * 0.02 * sc, sy - S * 0.68 + dy],
+    // при прицеливании винтовка поднимается к глазу
+    gun: [sx + S * 0.03 * sc, sy - S * 0.68 + dy - S * 0.13 * sc],
+  };
+}
+
+function drawShooter(g, angle, pose) {
+  const { S, sx, sy } = g, lw = Math.max(2.5, S * 0.06), J = shooterJoints(g, pose), L = J.L;
   ctx.save();
-  ctx.strokeStyle = ctx.fillStyle = '#4f9cff'; ctx.lineWidth = lw; ctx.lineCap = 'round';
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = ctx.fillStyle = '#4f9cff'; ctx.lineWidth = lw;
   ctx.beginPath();
-  ctx.moveTo(sx - S * 0.17, sy); ctx.lineTo(sx, sy - S * 0.42); ctx.lineTo(sx + S * 0.17, sy);
-  ctx.moveTo(sx, sy - S * 0.42); ctx.lineTo(sx, sy - S * 0.74);
-  ctx.moveTo(sx, sy - S * 0.68); ctx.lineTo(sx - S * 0.18, sy - S * 0.5);
+  // задняя нога (на колене — колено на земле)
+  ctx.moveTo(sx, J.hipY); ctx.lineTo(L(sx - S * 0.085, sx - S * 0.1), L(sy - S * 0.21, sy - S * 0.01));
+  ctx.lineTo(L(sx - S * 0.17, sx - S * 0.32), L(sy, sy - S * 0.02));
+  // передняя нога
+  ctx.moveTo(sx, J.hipY); ctx.lineTo(L(sx + S * 0.085, sx + S * 0.17), L(sy - S * 0.21, sy - S * 0.22));
+  ctx.lineTo(L(sx + S * 0.17, sx + S * 0.17), sy);
+  // туловище
+  ctx.moveTo(sx, J.hipY); ctx.lineTo(...J.neck);
   ctx.stroke();
-  ctx.beginPath(); ctx.arc(sx, sy - S * 0.86, S * 0.12, 0, 7); ctx.fill();
-  // рука с оружием смотрит на цель
-  const shx = sx, shy = sy - S * 0.68, ca = Math.cos(angle), sa = Math.sin(angle);
-  const hx = shx + ca * S * 0.32, hy = shy + sa * S * 0.32;
-  ctx.beginPath(); ctx.moveTo(shx, shy); ctx.lineTo(hx, hy); ctx.stroke();
-  ctx.strokeStyle = '#c9ced8'; ctx.lineWidth = lw * 1.6; ctx.lineCap = 'butt';
-  ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + ca * S * 0.22, hy + sa * S * 0.22); ctx.stroke();
-  if (flash) {
-    ctx.fillStyle = '#ffd36b';
-    ctx.beginPath(); ctx.arc(hx + ca * S * 0.27, hy + sa * S * 0.27, S * 0.06, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(...J.head, S * 0.12, 0, 7); ctx.fill();
+
+  // винтовка: P(d, o) — точка на расстоянии d вдоль ствола и o «вверх» от него
+  const ca = Math.cos(angle), sa = Math.sin(angle), back = pose.recoil * S * 0.06;
+  const P = (d, o = 0) => [J.gun[0] + ca * (d * S - back) + sa * o * S, J.gun[1] + sa * (d * S - back) - ca * o * S];
+  const seg = (a, b, w, c) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); };
+  // руки держат винтовку
+  ctx.strokeStyle = '#4f9cff'; ctx.lineWidth = lw;
+  ctx.beginPath();
+  ctx.moveTo(...J.shoulder); ctx.lineTo(...P(0.06, -0.03));
+  ctx.moveTo(...J.shoulder); ctx.lineTo(...P(0.32, -0.03));
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+  seg(P(-0.12, -0.01), P(0.1), lw * 2.3, '#9a6a42');            // приклад
+  seg(P(0.1), P(0.4), lw * 1.5, '#6b7280');                     // ствольная коробка
+  seg(P(0.4), P(0.74), lw * 0.75, '#c9ced8');                   // ствол
+  seg(P(0.14, 0.055), P(0.32, 0.055), lw * 1.1, '#2f343f');     // оптика
+  seg(P(0.14, 0.055), P(0.32, 0.055), lw * 0.5, '#8fc0ff');
+  if (pose.flash) {
+    const r = S * (pose.big ? 0.11 : 0.07), [fx, fy] = P(0.8);
+    ctx.fillStyle = '#ffd36b'; ctx.beginPath(); ctx.arc(fx, fy, r, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff4c9'; ctx.beginPath(); ctx.arc(fx, fy, r * 0.5, 0, 7); ctx.fill();
   }
   ctx.restore();
-  return [hx + ca * S * 0.24, hy + sa * S * 0.24];   // кончик ствола
+  return P(0.74);   // дульный срез
 }
 
 function drawCrowd(k, force) {
@@ -219,8 +234,13 @@ function drawCrowd(k, force) {
   if (k === crowd.k) return;
   const diff = k - crowd.k;
   if (crowd.k >= 0 && diff > 0 && (diff <= 3 || fast)) {
-    const now = performance.now(), start = Math.max(now, ...crowd.shots.map(s => s.t0 + T_GAP));
-    for (let i = crowd.k; i < k; i++) crowd.shots.push({ n: i, t0: start + (i - crowd.k) * T_GAP });
+    const now = performance.now(), gapAfter = s => s.kind === 'norm' ? T_GAP : HOLD + BACK;
+    let start = Math.max(now, ...crowd.shots.map(s => s.t0 + gapAfter(s)));
+    for (let i = crowd.k; i < k; i++) {
+      const kind = fast ? 'norm' : kindOf(i);        // в «уйти пораньше» без церемоний
+      const s = { n: i, kind, t0: start + (PREP[kind] || 0) };
+      crowd.shots.push(s); start = s.t0 + gapAfter(s);
+    }
   } else { crowd.shots = []; crowd.dead = k; }   // большой скачок — без анимации
   crowd.k = k;
 }
@@ -232,15 +252,29 @@ function crowdFrame(now) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, g.W, g.H);
 
-  // какие выстрелы закончились — человечек окончательно лежит
+  // какие выстрелы закончились — человечек окончательно лежит, стрелок вернулся в стойку
   crowd.shots = crowd.shots.filter(s => {
-    if (now - s.t0 >= T_BULLET + T_FALL) { crowd.dead = Math.max(crowd.dead, s.n + 1); return false; }
-    return true;
+    const t = now - s.t0;
+    if (t >= T_BULLET + fallTime(s)) crowd.dead = Math.max(crowd.dead, s.n + 1);
+    return t < Math.max(T_BULLET + fallTime(s), s.kind === 'norm' ? 0 : HOLD + BACK);
   });
   const fall = {};
   for (const s of crowd.shots) {
     const t = now - s.t0 - T_BULLET;
-    fall[ORDER[s.n]] = t <= 0 ? 0 : Math.min(1, t / T_FALL);
+    if (s.n >= crowd.dead) fall[ORDER[s.n]] = t <= 0 ? 0 : Math.min(1, t / fallTime(s));
+  }
+
+  // поза стрелка
+  const pose = { kneel: 0, scope: 0, recoil: 0, flash: false, big: false };
+  for (const s of crowd.shots) {
+    const t = now - s.t0;
+    if (t >= 0 && t < 140) { pose.recoil = 1 - t / 140; pose.flash = t < 90; pose.big = s.kind === 'fat'; }
+    if (s.kind === 'norm') continue;
+    const pre = PREP[s.kind];
+    if (t < -pre || t > HOLD + BACK) continue;
+    const p = t < 0 ? Math.min(1, (t + pre) / (pre * 0.5)) : t < HOLD ? 1 : Math.max(0, 1 - (t - HOLD) / BACK);
+    const e = p * p * (3 - 2 * p);
+    if (s.kind === 'hat') pose.kneel = Math.max(pose.kneel, e); else pose.scope = Math.max(pose.scope, e);
   }
 
   // толпа
@@ -249,41 +283,52 @@ function crowdFrame(now) {
     const rank = ORDER.indexOf(i);
     if (rank < crowd.dead) {
       ctx.fillStyle = 'rgba(192, 70, 70, 0.35)';
-      ctx.beginPath(); ctx.ellipse(p.x, p.y - g.s * 0.04, g.s * 0.45, g.s * 0.07, 0, 0, 7); ctx.fill();
-      figure(p.x, p.y - g.s * 0.08, g.s, Math.PI / 2, '#6b6f7a', lw);
+      const pr = isFat(rank) ? 1.3 : 1;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y - g.s * 0.04, g.s * 0.45 * pr, g.s * 0.07 * pr, 0, 0, 7); ctx.fill();
+      figure(p.x, p.y - g.s * 0.08, g.s, Math.PI / 2, '#6b6f7a', lw, rank);
     } else if (i in fall) {
       const f = fall[i], e = f * f;
-      figure(p.x, p.y - g.s * 0.08 * e, g.s, e * Math.PI / 2, f > 0 ? '#e07a7a' : '#e8eaf0', lw);
+      figure(p.x, p.y - g.s * 0.08 * e, g.s, e * Math.PI / 2, f > 0 ? '#e07a7a' : '#e8eaf0', lw, rank);
     } else {
-      figure(p.x, p.y, g.s, 0, '#e8eaf0', lw);
+      figure(p.x, p.y, g.s, 0, '#e8eaf0', lw, rank);
     }
   });
 
-  // цель: текущий выстрел или следующий по очереди
-  const started = crowd.shots.filter(s => now >= s.t0 - T_GAP * 0.6);
+  // цель: текущий выстрел (или подготовка к нему) либо следующий по очереди
+  const started = crowd.shots.filter(s => now >= s.t0 - Math.max(T_GAP * 0.6, PREP[s.kind] || 0));
   const shot = started[started.length - 1];
   const n = shot ? shot.n : crowd.k;
-  let tip = null, flash = false;
+  const J = shooterJoints(g, pose);
   if (n >= 0 && n < N) {
-    const p = g.people[ORDER[n]], tx = p.x, ty = p.y - g.s * 0.6;
-    if (!shot) {   // прицел на следующем
-      ctx.strokeStyle = 'rgba(255, 90, 90, 0.8)'; ctx.lineWidth = 1.5;
-      const r = g.s * 0.42;
+    const p = g.people[ORDER[n]], big = isFat(n) ? 1.3 : 1, tx = p.x, ty = p.y - g.s * 0.6 * big;
+    ctx.strokeStyle = 'rgba(255, 90, 90, 0.8)'; ctx.lineWidth = 1.5;
+    if (!shot) {   // обычный прицел на следующем
+      const r = g.s * 0.42 * big;
       ctx.beginPath(); ctx.arc(tx, ty, r, 0, 7);
       ctx.moveTo(tx - r * 1.3, ty); ctx.lineTo(tx - r * 0.6, ty); ctx.moveTo(tx + r * 0.6, ty); ctx.lineTo(tx + r * 1.3, ty);
       ctx.moveTo(tx, ty - r * 1.3); ctx.lineTo(tx, ty - r * 0.6); ctx.moveTo(tx, ty + r * 0.6); ctx.lineTo(tx, ty + r * 1.3);
       ctx.stroke();
+    } else if (pose.scope > 0.05) {   // вид через оптику: большое кольцо сходится на толстом
+      const r = g.s * (2.6 - 1.4 * pose.scope);
+      ctx.save(); ctx.globalAlpha = pose.scope;
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(20, 22, 28, 0.85)';
+      ctx.beginPath(); ctx.arc(tx, ty, r + 3, 0, 7); ctx.stroke();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255, 90, 90, 0.95)';
+      ctx.beginPath(); ctx.arc(tx, ty, r, 0, 7);
+      ctx.moveTo(tx - r, ty); ctx.lineTo(tx + r, ty); ctx.moveTo(tx, ty - r); ctx.lineTo(tx, ty + r);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255, 90, 90, 0.95)'; ctx.beginPath(); ctx.arc(tx, ty, 2, 0, 7); ctx.fill();
+      ctx.restore();
     }
-    const want = Math.atan2(ty - (g.sy - g.S * 0.68), tx - g.sx);
-    crowd.aim += (want - crowd.aim) * 0.15;   // плавно поворачивает руку
-    flash = crowd.shots.some(s => now >= s.t0 && now - s.t0 < 90);
+    const want = Math.atan2(ty - J.gun[1], tx - J.gun[0]);
+    crowd.aim += (want - crowd.aim) * 0.15;   // плавно наводит винтовку
   }
-  tip = drawShooter(g, crowd.aim, flash);
+  const tip = drawShooter(g, crowd.aim, pose);
   // все пули в полёте (в быстром режиме их несколько сразу)
   ctx.fillStyle = '#ffd36b';
   for (const s of crowd.shots) {
     const t = now - s.t0; if (t < 0 || t >= T_BULLET) continue;
-    const p = g.people[ORDER[s.n]], q = t / T_BULLET, tx = p.x, ty = p.y - g.s * 0.6;
+    const p = g.people[ORDER[s.n]], q = t / T_BULLET, tx = p.x, ty = p.y - g.s * 0.6 * (s.kind === 'fat' ? 1.3 : 1);
     ctx.beginPath(); ctx.arc(tip[0] + (tx - tip[0]) * q, tip[1] + (ty - tip[1]) * q, Math.max(2, g.S * 0.025), 0, 7); ctx.fill();
   }
 }
@@ -314,14 +359,16 @@ function render() {
   $('timer').textContent = fmt(left);
   $('percent').textContent = pct.toFixed(2) + '%';
   drawCrowd(Math.floor(pct * N / 100 + 1e-9));
-  $('ring').style.strokeDashoffset = C * (1 - pct / 100);
-  $('ring').classList.toggle('full', pct >= 100);
   // 1% дня в минутах и секундах + сколько до следующего процента
   const onePct = dayLenMs() / 100, oneShot = dayLenMs() / N;
   const ms = t => { const x = Math.round(t / 1000); return Math.floor(x / 60) + ' мин ' + String(x % 60).padStart(2, '0') + ' сек'; };
   const toNext = left % oneShot || oneShot;
-  $('percentSub').innerHTML = '1% = <b>' + ms(onePct) + '</b> · выстрел каждые <b>' + ms(oneShot) + '</b>' +
-    (pct < 100 ? '<br>следующий выстрел через <b>' + ms(toNext) + '</b>' : '');
+  const mmss = t => { const x = Math.round(t / 1000); return Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0'); };
+  $('percentSub').innerHTML = innerWidth <= 700
+    // на телефоне коротко
+    ? '1% = <b>' + mmss(onePct) + '</b> · выстрел <b>' + mmss(oneShot) + '</b>' + (pct < 100 ? '<br>следующий через <b>' + mmss(toNext) + '</b>' : '')
+    : '1% = <b>' + ms(onePct) + '</b> · выстрел каждые <b>' + ms(oneShot) + '</b>' +
+      (pct < 100 ? '<br>следующий выстрел через <b>' + ms(toNext) + '</b>' : '');
 
   $('timerSub').textContent = fast ? (left === 0 ? 'Ушёл пораньше 😎' : 'сбегаем…')
     : left === 0 ? 'Рабочий день окончен 🎉' : 'до ' + state.end;
@@ -350,173 +397,6 @@ $('leave').onclick = () => {
 
 render();
 setInterval(render, 100);
-// ===== Крестики-нолики =====
-const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-const MISTAKE = 0.2;           // шанс, что компьютер сходит случайно (иначе его не победить)
-const game = { b: Array(9).fill(''), busy: false, score: { X: 0, O: 0, D: 0 } };
-try { Object.assign(game.score, JSON.parse(localStorage.getItem('tttScore')) || {}); } catch {}
-const cells = [];
-for (let i = 0; i < 9; i++) {
-  const c = document.createElement('button');
-  c.className = 'cell'; c.onclick = () => playerMove(i);
-  $('board').appendChild(c); cells.push(c);
-}
-
-function winner(b) {
-  for (const l of LINES) if (b[l[0]] && b[l[0]] === b[l[1]] && b[l[1]] === b[l[2]]) return { who: b[l[0]], line: l };
-  return b.every(Boolean) ? { who: 'D', line: [] } : null;
-}
-
-// Минимакс: O максимизирует, X минимизирует; быстрее победа — лучше
-function minimax(b, turn, depth) {
-  const w = winner(b);
-  if (w) return w.who === 'O' ? 10 - depth : w.who === 'X' ? depth - 10 : 0;
-  let best = turn === 'O' ? -Infinity : Infinity;
-  for (let i = 0; i < 9; i++) if (!b[i]) {
-    b[i] = turn;
-    const v = minimax(b, turn === 'O' ? 'X' : 'O', depth + 1);
-    b[i] = '';
-    best = turn === 'O' ? Math.max(best, v) : Math.min(best, v);
-  }
-  return best;
-}
-
-function aiMove() {
-  const free = game.b.map((v, i) => v ? -1 : i).filter(i => i >= 0);
-  if (Math.random() < MISTAKE) return free[Math.floor(Math.random() * free.length)];
-  let best = -Infinity, moves = [];
-  for (const i of free) {
-    game.b[i] = 'O'; const v = minimax(game.b, 'X', 1); game.b[i] = '';
-    if (v > best) { best = v; moves = [i]; } else if (v === best) moves.push(i);
-  }
-  return moves[Math.floor(Math.random() * moves.length)];
-}
-
-function paint() {
-  game.b.forEach((v, i) => {
-    cells[i].textContent = v === 'X' ? '✕' : v === 'O' ? '◯' : '';
-    cells[i].className = 'cell' + (v ? ' ' + v.toLowerCase() : '');
-    cells[i].disabled = !!v || game.busy;
-  });
-  $('sX').textContent = game.score.X; $('sO').textContent = game.score.O; $('sD').textContent = game.score.D;
-}
-
-function finish(w) {
-  game.busy = true;
-  game.score[w.who]++;
-  try { localStorage.setItem('tttScore', JSON.stringify(game.score)); } catch {}
-  paint();
-  w.line.forEach(i => cells[i].classList.add('win'));
-  setTimeout(() => {
-    $('result').textContent = w.who === 'X' ? 'Ты победил! 🎉' : w.who === 'O' ? 'Победил компьютер 🤖' : 'Ничья 🤝';
-    $('result').classList.add('show');
-    setTimeout(() => {
-      $('result').classList.remove('show');
-      game.b = Array(9).fill(''); game.busy = false; paint();
-    }, 1500);
-  }, 1000);
-}
-
-function playerMove(i) {
-  if (game.busy || game.b[i]) return;
-  game.b[i] = 'X';
-  let w = winner(game.b);
-  if (w) return finish(w);
-  game.busy = true; paint();
-  setTimeout(() => {
-    game.b[aiMove()] = 'O'; game.busy = false;
-    w = winner(game.b);
-    w ? finish(w) : paint();
-  }, 350);
-}
-
-// Поле ≈ 1/9 площади экрана: сторона = √(ширина × высота / 9)
-function sizeBoard() {
-  const side = Math.min(Math.sqrt(innerWidth * innerHeight / 9), innerWidth - 32);
-  $('boardWrap').style.width = side + 'px';
-  $('snakeWrap').style.width = side + 'px';
-  cells.forEach(c => c.style.fontSize = side / 5 + 'px');
-  if (window.snakeResize) snakeResize();
-}
-addEventListener('resize', sizeBoard);
-
-// ===== Змейка =====
-const SN = 20;                       // поле 20×20 клеток
-const sCvs = $('snake'), sCtx = sCvs.getContext('2d');
-const snake = { body: [], dir: [1, 0], queue: [], food: null, score: 0, state: 'idle', timer: null };
-try { snake.best = +localStorage.getItem('snakeBest') || 0; } catch { snake.best = 0; }
-
-function snakeReset() {
-  snake.body = [[9, 10], [8, 10], [7, 10]];
-  snake.dir = [1, 0]; snake.queue = []; snake.score = 0; snake.state = 'idle';
-  placeFood(); snakeDraw();
-}
-function placeFood() {
-  do { snake.food = [Math.floor(Math.random() * SN), Math.floor(Math.random() * SN)]; }
-  while (snake.body.some(([x, y]) => x === snake.food[0] && y === snake.food[1]));
-}
-function snakeStep() {
-  // берём следующий поворот из очереди (чтобы быстрые нажатия не терялись)
-  if (snake.queue.length) snake.dir = snake.queue.shift();
-  const [hx, hy] = snake.body[0];
-  const nx = hx + snake.dir[0], ny = hy + snake.dir[1];
-  const ate = nx === snake.food[0] && ny === snake.food[1];
-  const tail = ate ? snake.body : snake.body.slice(0, -1);
-  if (nx < 0 || ny < 0 || nx >= SN || ny >= SN || tail.some(([x, y]) => x === nx && y === ny)) return snakeOver();
-  snake.body = [[nx, ny], ...tail];
-  if (ate) { snake.score++; placeFood(); }
-  snakeDraw();
-}
-function snakeOver() {
-  clearInterval(snake.timer); snake.state = 'over';
-  if (snake.score > snake.best) {
-    snake.best = snake.score;
-    try { localStorage.setItem('snakeBest', snake.best); } catch {}
-  }
-  snakeDraw(true);
-  setTimeout(() => {
-    $('snResult').textContent = 'Игра окончена · счёт ' + snake.score;
-    $('snResult').classList.add('show');
-    setTimeout(() => { $('snResult').classList.remove('show'); snakeReset(); }, 1500);
-  }, 1000);
-}
-function snakeDraw(dead) {
-  const W = sCvs.width, c = W / SN, r = c * 0.25;
-  sCtx.clearRect(0, 0, W, W);
-  sCtx.fillStyle = 'rgba(255,255,255,0.025)';
-  for (let x = 0; x < SN; x++) for (let y = 0; y < SN; y++) if ((x + y) % 2) sCtx.fillRect(x * c, y * c, c, c);
-  // еда — песчинка
-  sCtx.fillStyle = '#e9c27a';
-  sCtx.beginPath(); sCtx.arc((snake.food[0] + 0.5) * c, (snake.food[1] + 0.5) * c, c * 0.32, 0, 7); sCtx.fill();
-  snake.body.forEach(([x, y], i) => {
-    sCtx.fillStyle = dead ? '#c0564f' : i === 0 ? '#8fc0ff' : '#4f9cff';
-    sCtx.beginPath(); sCtx.roundRect(x * c + 1, y * c + 1, c - 2, c - 2, r); sCtx.fill();
-  });
-  $('snScore').textContent = snake.score; $('snBest').textContent = snake.best;
-}
-window.snakeResize = () => {
-  const dpr = window.devicePixelRatio || 1, w = sCvs.clientWidth;
-  sCvs.width = Math.round(w * dpr); sCvs.height = sCvs.width;
-  if (snake.food) snakeDraw(snake.state === 'over');
-};
-
-const KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
-addEventListener('keydown', e => {
-  const d = KEYS[e.key];
-  if (!d || e.target.tagName === 'INPUT') return;
-  // стрелки не прокручивают страницу, пока змейка видна на экране
-  const r = $('snakeWrap').getBoundingClientRect();
-  if (r.bottom < 0 || r.top > innerHeight) return;
-  e.preventDefault();
-  if (snake.state === 'over') return;
-  const last = snake.queue[snake.queue.length - 1] || snake.dir;
-  if (d[0] === -last[0] && d[1] === -last[1]) return;     // разворот на 180° запрещён
-  if (d[0] === last[0] && d[1] === last[1]) { if (snake.state === 'run') return; }
-  else if (snake.queue.length < 3) snake.queue.push(d);
-  if (snake.state === 'idle') { snake.state = 'run'; snake.timer = setInterval(snakeStep, 120); }
-});
-snakeResize(); snakeReset();
-sizeBoard(); paint();
 </script>
 </body>
 </html>
