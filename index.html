@@ -157,9 +157,9 @@ const state = Object.assign({
   pausedLeft: null        // оставшиеся ms, если на паузе
 }, load());
 
-// Стрелок и 100 человечков: каждый человечек = 1% дня.
+// Стрелок и 300 человечков: каждый человечек = 1/300 дня.
 const cvs = $('grid'), ctx = cvs.getContext('2d');
-const N = 100;
+const N = 300;
 const T_BULLET = 260, T_FALL = 420, T_GAP = 700;   // мс: полёт пули, падение, интервал между выстрелами
 // Цели идут по порядку: слева направо, ряд за рядом сверху вниз
 const ORDER = [...Array(N).keys()];
@@ -172,7 +172,7 @@ function crowdGeometry() {
   const sx = Math.max(S * 0.6, W * 0.07), sy = H / 2 + S / 2;
   const x0 = sx + S * 1.6, x1 = W - 8, y0 = 8, y1 = H - 8;
   const aw = x1 - x0, ah = y1 - y0;
-  const [cols, rows] = [[4, 25], [5, 20], [10, 10], [20, 5], [25, 4]].reduce((a, b) =>
+  const [cols, rows] = [[6, 50], [10, 30], [12, 25], [15, 20], [20, 15], [25, 12], [30, 10], [50, 6], [60, 5]].reduce((a, b) =>
     Math.abs(Math.log(b[0] / b[1] * ah / aw)) < Math.abs(Math.log(a[0] / a[1] * ah / aw)) ? b : a);
   const cw = aw / cols, ch = ah / rows, s = Math.min(cw * 0.75, ch * 0.85);
   const people = [...Array(N).keys()].map(i => {
@@ -332,14 +332,15 @@ function render() {
   const pct = Math.min(100, Math.max(0, (1 - left / dayLenMs()) * 100));
   $('timer').textContent = fmt(left);
   $('percent').textContent = pct.toFixed(2) + '%';
-  drawCrowd(Math.floor(pct));
+  drawCrowd(Math.floor(pct * N / 100 + 1e-9));
   $('ring').style.strokeDashoffset = C * (1 - pct / 100);
   $('ring').classList.toggle('full', pct >= 100);
   // 1% дня в минутах и секундах + сколько до следующего процента
-  const onePct = dayLenMs() / 100, ms = t => { const x = Math.round(t / 1000); return Math.floor(x / 60) + ' мин ' + String(x % 60).padStart(2, '0') + ' сек'; };
-  const toNext = left % onePct || onePct;
-  $('percentSub').innerHTML = '1% = <b>' + ms(onePct) + '</b>' +
-    (pct < 100 ? '<br>следующий через <b>' + ms(toNext) + '</b>' : '');
+  const onePct = dayLenMs() / 100, oneShot = dayLenMs() / N;
+  const ms = t => { const x = Math.round(t / 1000); return Math.floor(x / 60) + ' мин ' + String(x % 60).padStart(2, '0') + ' сек'; };
+  const toNext = left % oneShot || oneShot;
+  $('percentSub').innerHTML = '1% = <b>' + ms(onePct) + '</b> · выстрел каждые <b>' + ms(oneShot) + '</b>' +
+    (pct < 100 ? '<br>следующий выстрел через <b>' + ms(toNext) + '</b>' : '');
 
   if (state.mode === 'auto') {
     $('timerSub').textContent = left === 0 ? 'Рабочий день окончен 🎉' : 'до ' + state.end;
