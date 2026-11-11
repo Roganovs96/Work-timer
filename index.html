@@ -39,9 +39,6 @@
     background: var(--card); border: 1px solid var(--border); border-radius: 16px;
     padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
   }
-  .tabs { display: flex; background: var(--track); border-radius: 10px; padding: 3px; }
-  .tabs button { background: none; color: var(--muted); border: 0; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; }
-  .tabs button.on { background: var(--accent); color: #fff; }
   .field { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
   input[type=time] {
     background: var(--track); color: var(--text); border: 1px solid var(--border);
@@ -101,19 +98,11 @@
   <div class="grid-wrap" id="gridWrap"><canvas id="grid"></canvas></div>
 
   <div class="panel">
-    <div class="tabs">
-      <button id="modeAuto" class="on">По часам</button>
-      <button id="modeManual">Вручную</button>
-    </div>
     <div class="field">
       Начало <input type="time" id="start" value="10:00">
       Конец <input type="time" id="end" value="19:00">
     </div>
-    <div class="field" id="manualBox">
-      Осталось <input type="time" id="manualLeft" step="1" value="04:30:00">
-      <button class="btn primary" id="go">Старт</button>
-      <button class="btn" id="pause">Пауза</button>
-    </div>
+    <button class="btn primary" id="leave" style="margin-left: auto">Уйти пораньше 🏃</button>
   </div>
 </div>
 
@@ -151,16 +140,14 @@ $('ring').style.strokeDasharray = C;
 const load = () => { try { return JSON.parse(localStorage.getItem('workTimer')) || {}; } catch { return {}; } };
 const save = () => { try { localStorage.setItem('workTimer', JSON.stringify(state)); } catch {} };
 
-const state = Object.assign({
-  mode: 'auto', start: '10:00', end: '19:00',
-  manualEndAt: null,      // момент (ms), когда ручной таймер дойдёт до нуля
-  pausedLeft: null        // оставшиеся ms, если на паузе
-}, load());
+const saved = load();
+const state = { start: saved.start || '10:00', end: saved.end || '19:00' };
 
 // Стрелок и 300 человечков: каждый человечек = 1/300 дня.
 const cvs = $('grid'), ctx = cvs.getContext('2d');
 const N = 300;
-const T_BULLET = 260, T_FALL = 420, T_GAP = 700;   // мс: полёт пули, падение, интервал между выстрелами
+// мс: полёт пули, падение, интервал между выстрелами (в режиме «уйти пораньше» всё быстрее)
+let T_BULLET = 260, T_FALL = 420, T_GAP = 700;
 // Цели идут по порядку: слева направо, ряд за рядом сверху вниз
 const ORDER = [...Array(N).keys()];
 const crowd = { geo: null, k: -1, dead: 0, shots: [], aim: 0 };
@@ -231,7 +218,7 @@ function drawCrowd(k, force) {
   }
   if (k === crowd.k) return;
   const diff = k - crowd.k;
-  if (crowd.k >= 0 && diff > 0 && diff <= 3) {
+  if (crowd.k >= 0 && diff > 0 && (diff <= 3 || fast)) {
     const now = performance.now(), start = Math.max(now, ...crowd.shots.map(s => s.t0 + T_GAP));
     for (let i = crowd.k; i < k; i++) crowd.shots.push({ n: i, t0: start + (i - crowd.k) * T_GAP });
   } else { crowd.shots = []; crowd.dead = k; }   // большой скачок — без анимации
@@ -273,9 +260,10 @@ function crowdFrame(now) {
   });
 
   // цель: текущий выстрел или следующий по очереди
-  const shot = crowd.shots.find(s => now >= s.t0 - T_GAP * 0.6);
+  const started = crowd.shots.filter(s => now >= s.t0 - T_GAP * 0.6);
+  const shot = started[started.length - 1];
   const n = shot ? shot.n : crowd.k;
-  let tip = null, flash = false, bullet = null;
+  let tip = null, flash = false;
   if (n >= 0 && n < N) {
     const p = g.people[ORDER[n]], tx = p.x, ty = p.y - g.s * 0.6;
     if (!shot) {   // прицел на следующем
@@ -288,15 +276,15 @@ function crowdFrame(now) {
     }
     const want = Math.atan2(ty - (g.sy - g.S * 0.68), tx - g.sx);
     crowd.aim += (want - crowd.aim) * 0.15;   // плавно поворачивает руку
-    const t = shot ? now - shot.t0 : -1;
-    flash = t >= 0 && t < 90;
-    if (t >= 0 && t < T_BULLET) bullet = { q: t / T_BULLET, tx, ty };
+    flash = crowd.shots.some(s => now >= s.t0 && now - s.t0 < 90);
   }
   tip = drawShooter(g, crowd.aim, flash);
-  if (bullet) {
-    const bx = tip[0] + (bullet.tx - tip[0]) * bullet.q, by = tip[1] + (bullet.ty - tip[1]) * bullet.q;
-    ctx.fillStyle = '#ffd36b';
-    ctx.beginPath(); ctx.arc(bx, by, Math.max(2, g.S * 0.025), 0, 7); ctx.fill();
+  // все пули в полёте (в быстром режиме их несколько сразу)
+  ctx.fillStyle = '#ffd36b';
+  for (const s of crowd.shots) {
+    const t = now - s.t0; if (t < 0 || t >= T_BULLET) continue;
+    const p = g.people[ORDER[s.n]], q = t / T_BULLET, tx = p.x, ty = p.y - g.s * 0.6;
+    ctx.beginPath(); ctx.arc(tip[0] + (tx - tip[0]) * q, tip[1] + (ty - tip[1]) * q, Math.max(2, g.S * 0.025), 0, 7); ctx.fill();
   }
 }
 requestAnimationFrame(crowdFrame);
@@ -310,21 +298,14 @@ const fmt = ms => {
   return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
 };
 
+// «Уйти пораньше»: оставшееся время быстро утекает до нуля
+let fast = null;
 function leftMs() {
-  if (state.mode === 'auto') {
-    const now = new Date();
-    const end = new Date(now); const [h, m] = state.end.split(':').map(Number);
-    end.setHours(h, m, 0, 0);
-    return Math.min(dayLenMs(), Math.max(0, end - now));
-  }
-  if (state.pausedLeft != null) return state.pausedLeft;
-  if (state.manualEndAt != null) return Math.max(0, state.manualEndAt - Date.now());
-  return parseLeftInput();
-}
-
-function parseLeftInput() {
-  const [h, m, s = 0] = ($('manualLeft').value || '0:0').split(':').map(Number);
-  return ((h * 60 + m) * 60 + s) * 1000;
+  if (fast) return fast.from * (1 - Math.min(1, (Date.now() - fast.t0) / fast.dur));
+  const now = new Date();
+  const end = new Date(now); const [h, m] = state.end.split(':').map(Number);
+  end.setHours(h, m, 0, 0);
+  return Math.min(dayLenMs(), Math.max(0, end - now));
 }
 
 function render() {
@@ -342,39 +323,32 @@ function render() {
   $('percentSub').innerHTML = '1% = <b>' + ms(onePct) + '</b> · выстрел каждые <b>' + ms(oneShot) + '</b>' +
     (pct < 100 ? '<br>следующий выстрел через <b>' + ms(toNext) + '</b>' : '');
 
-  if (state.mode === 'auto') {
-    $('timerSub').textContent = left === 0 ? 'Рабочий день окончен 🎉' : 'до ' + state.end;
-  } else {
-    $('timerSub').textContent = state.pausedLeft != null ? 'на паузе'
-      : state.manualEndAt != null ? (left === 0 ? 'Готово 🎉' : 'идёт отсчёт') : 'задай время и нажми «Старт»';
-  }
+  $('timerSub').textContent = fast ? (left === 0 ? 'Ушёл пораньше 😎' : 'сбегаем…')
+    : left === 0 ? 'Рабочий день окончен 🎉' : 'до ' + state.end;
   document.title = Math.floor(pct) + '% · ' + fmt(left).slice(0, 5);
 }
 
-function applyMode() {
-  $('modeAuto').classList.toggle('on', state.mode === 'auto');
-  $('modeManual').classList.toggle('on', state.mode === 'manual');
-  $('manualBox').classList.toggle('hidden', state.mode !== 'manual');
-  $('pause').textContent = state.pausedLeft != null ? 'Продолжить' : 'Пауза';
-  render();
-}
-
 $('start').value = state.start; $('end').value = state.end;
-$('modeAuto').onclick = () => { state.mode = 'auto'; save(); applyMode(); };
-$('modeManual').onclick = () => { state.mode = 'manual'; save(); applyMode(); };
 $('start').onchange = e => { state.start = e.target.value; save(); render(); };
 $('end').onchange = e => { state.end = e.target.value; save(); render(); };
-$('manualLeft').oninput = () => { if (state.manualEndAt == null && state.pausedLeft == null) render(); };
-$('go').onclick = () => {
-  state.manualEndAt = Date.now() + parseLeftInput(); state.pausedLeft = null; save(); applyMode();
-};
-$('pause').onclick = () => {
-  if (state.pausedLeft != null) { state.manualEndAt = Date.now() + state.pausedLeft; state.pausedLeft = null; }
-  else if (state.manualEndAt != null) { state.pausedLeft = Math.max(0, state.manualEndAt - Date.now()); }
-  save(); applyMode();
+
+$('leave').onclick = () => {
+  if (fast) {
+    // вернуться к работе: обычная скорость, человечки снова по реальному времени
+    fast = null; T_BULLET = 260; T_FALL = 420; T_GAP = 700;
+    crowd.shots = [];
+    $('leave').textContent = 'Уйти пораньше 🏃';
+  } else {
+    const rest = Math.max(1, N - crowd.k);                  // сколько ещё стоит
+    const per = Math.max(10, Math.min(400, 5000 / rest));    // мс на одного, вся очередь ≤ 5 сек
+    T_GAP = per; T_BULLET = Math.min(260, Math.max(80, per * 2)); T_FALL = Math.min(420, Math.max(150, per * 4));
+    fast = { from: leftMs(), t0: Date.now(), dur: rest * per };
+    $('leave').textContent = 'Вернуться к работе 💼';
+  }
+  render();
 };
 
-applyMode();
+render();
 setInterval(render, 100);
 // ===== Крестики-нолики =====
 const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
