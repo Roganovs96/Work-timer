@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Рабочий день</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #181b22; --text: #e8eaf0; --muted: #8a90a0;
+    --track: #262a34; --accent: #4f9cff; --done: #3ddc97; --border: #2a2f3a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    padding: 16px;
+  }
+  .app { height: calc(100vh - 32px); display: flex; flex-direction: column; gap: 12px; }
+  .cards { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; }
+  @media (max-width: 700px) { .cards { grid-template-columns: 1fr; } }
+  .grid-wrap { flex: 1; min-height: 160px; position: relative; }
+  #grid { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 14px 20px;
+  }
+  .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+  .timer { font-size: 44px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .percent { font-size: 48px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 4px; text-align: center; line-height: 1.5; }
+  .sub b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  svg { width: 110px; height: 110px; transform: rotate(-90deg); }
+  .ring-track { stroke: var(--track); }
+  .ring { stroke: var(--accent); transition: stroke-dashoffset .1s linear, stroke .3s; }
+  .ring.full { stroke: var(--done); }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
+  }
+  .tabs { display: flex; background: var(--track); border-radius: 10px; padding: 3px; }
+  .tabs button { background: none; color: var(--muted); border: 0; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+  .tabs button.on { background: var(--accent); color: #fff; }
+  .field { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+  input[type=time] {
+    background: var(--track); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 8px; font-size: 15px; color-scheme: dark;
+  }
+  .btn { background: var(--track); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 14px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .hidden { display: none !important; }
+
+  /* Крестики-нолики */
+  .game { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px 0; }
+  .score { display: flex; gap: 24px; color: var(--muted); font-size: 14px; }
+  .score b { color: var(--text); font-variant-numeric: tabular-nums; margin-left: 6px; }
+  .board-wrap { position: relative; }
+  .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: var(--border); border-radius: 14px; padding: 6px; }
+  .cell {
+    background: var(--card); border: 0; border-radius: 9px; cursor: pointer; aspect-ratio: 1;
+    font-weight: 700; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0;
+  }
+  .cell:disabled { cursor: default; }
+  .cell.x { color: var(--accent); }
+  .cell.o { color: #e9c27a; }
+  .cell.win { background: #23324a; }
+  .result {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(15, 17, 21, 0.85); border-radius: 14px; font-size: 26px; font-weight: 700;
+    opacity: 0; pointer-events: none; transition: opacity .25s; text-align: center; padding: 12px;
+  }
+  .result.show { opacity: 1; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .games { display: flex; flex-wrap: wrap; gap: 48px; justify-content: center; align-items: flex-start; width: 100%; }
+  .game-col { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  #snake { display: block; width: 100%; aspect-ratio: 1; background: var(--card); border: 6px solid var(--border); border-radius: 14px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="cards">
+    <div class="card">
+      <div class="label">Осталось</div>
+      <div class="timer" id="timer">00:00:00</div>
+      <div class="sub" id="timerSub"></div>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 120 120">
+        <circle class="ring-track" cx="60" cy="60" r="52" fill="none" stroke-width="12"/>
+        <circle class="ring" id="ring" cx="60" cy="60" r="52" fill="none" stroke-width="12" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="card">
+      <div class="label">Прошло</div>
+      <div class="percent" id="percent">0%</div>
+      <div class="sub" id="percentSub"></div>
+    </div>
+  </div>
+
+  <div class="grid-wrap" id="gridWrap"><canvas id="grid"></canvas></div>
+
+  <div class="panel">
+    <div class="tabs">
+      <button id="modeAuto" class="on">По часам</button>
+      <button id="modeManual">Вручную</button>
+    </div>
+    <div class="field">
+      Начало <input type="time" id="start" value="10:00">
+      Конец <input type="time" id="end" value="19:00">
+    </div>
+    <div class="field" id="manualBox">
+      Осталось <input type="time" id="manualLeft" step="1" value="04:30:00">
+      <button class="btn primary" id="go">Старт</button>
+      <button class="btn" id="pause">Пауза</button>
+    </div>
+  </div>
+</div>
+
+<section class="game">
+  <div class="games">
+    <div class="game-col">
+      <div class="score">
+        <span>Ты<b id="sX">0</b></span><span>Ничьи<b id="sD">0</b></span><span>Компьютер<b id="sO">0</b></span>
+      </div>
+      <div class="board-wrap" id="boardWrap">
+        <div class="board" id="board"></div>
+        <div class="result" id="result"></div>
+      </div>
+      <div class="hint">Ты ходишь крестиками</div>
+    </div>
+    <div class="game-col">
+      <div class="score">
+        <span>Счёт<b id="snScore">0</b></span><span>Рекорд<b id="snBest">0</b></span>
+      </div>
+      <div class="board-wrap" id="snakeWrap">
+        <canvas id="snake"></canvas>
+        <div class="result" id="snResult"></div>
+      </div>
+      <div class="hint">Управление стрелками, старт — любой стрелкой</div>
+    </div>
+  </div>
+</section>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const R = 52, C = 2 * Math.PI * R;
+$('ring').style.strokeDasharray = C;
+
+const load = () => { try { return JSON.parse(localStorage.getItem('workTimer')) || {}; } catch { return {}; } };
+const save = () => { try { localStorage.setItem('workTimer', JSON.stringify(state)); } catch {} };
+
+const state = Object.assign({
+  mode: 'auto', start: '10:00', end: '19:00',
+  manualEndAt: null,      // момент (ms), когда ручной таймер дойдёт до нуля
+  pausedLeft: null        // оставшиеся ms, если на паузе
+}, load());
+
+// Стрелок и 100 человечков: каждый человечек = 1% дня.
+const cvs = $('grid'), ctx = cvs.getContext('2d');
+const N = 100;
+const T_BULLET = 260, T_FALL = 420, T_GAP = 700;   // мс: полёт пули, падение, интервал между выстрелами
+// Цели идут по порядку: слева направо, ряд за рядом сверху вниз
+const ORDER = [...Array(N).keys()];
+const crowd = { geo: null, k: -1, dead: 0, shots: [], aim: 0 };
+
+function crowdGeometry() {
+  const W = $('gridWrap').clientWidth, H = $('gridWrap').clientHeight;
+  if (!W || !H) return null;
+  const S = Math.min(H * 0.42, W * 0.12);           // рост стрелка
+  const sx = Math.max(S * 0.6, W * 0.07), sy = H / 2 + S / 2;
+  const x0 = sx + S * 1.6, x1 = W - 8, y0 = 8, y1 = H - 8;
+  const aw = x1 - x0, ah = y1 - y0;
+  const [cols, rows] = [[4, 25], [5, 20], [10, 10], [20, 5], [25, 4]].reduce((a, b) =>
+    Math.abs(Math.log(b[0] / b[1] * ah / aw)) < Math.abs(Math.log(a[0] / a[1] * ah / aw)) ? b : a);
+  const cw = aw / cols, ch = ah / rows, s = Math.min(cw * 0.75, ch * 0.85);
+  const people = [...Array(N).keys()].map(i => {
+    const c = i % cols, r = Math.floor(i / cols);
+    return { x: x0 + (c + 0.5) * cw, y: y0 + (r + 1) * ch - ch * 0.08 };   // y — уровень ног
+  });
+  return { W, H, S, sx, sy, s, people };
+}
+
+// Палочный человечек: (x, y) — ноги, a — угол падения (0 стоит, π/2 лежит)
+function figure(x, y, s, a, color, lw) {
+  ctx.save();
+  ctx.translate(x - s * 0.45 * Math.sin(a), y); ctx.rotate(a);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lw || Math.max(1.5, s * 0.08);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.16, 0); ctx.lineTo(0, -s * 0.42); ctx.lineTo(s * 0.16, 0);      // ноги
+  ctx.moveTo(0, -s * 0.42); ctx.lineTo(0, -s * 0.74);                                // туловище
+  ctx.moveTo(-s * 0.2, -s * 0.5); ctx.lineTo(0, -s * 0.68); ctx.lineTo(s * 0.2, -s * 0.5); // руки
+  ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, -s * 0.86, s * 0.12, 0, 7); ctx.fill();               // голова
+  ctx.restore();
+}
+
+function drawShooter(g, angle, flash) {
+  const { S, sx, sy } = g, lw = Math.max(2.5, S * 0.06);
+  ctx.save();
+  ctx.strokeStyle = ctx.fillStyle = '#4f9cff'; ctx.lineWidth = lw; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(sx - S * 0.17, sy); ctx.lineTo(sx, sy - S * 0.42); ctx.lineTo(sx + S * 0.17, sy);
+  ctx.moveTo(sx, sy - S * 0.42); ctx.lineTo(sx, sy - S * 0.74);
+  ctx.moveTo(sx, sy - S * 0.68); ctx.lineTo(sx - S * 0.18, sy - S * 0.5);
+  ctx.stroke();
+  ctx.beginPath(); ctx.arc(sx, sy - S * 0.86, S * 0.12, 0, 7); ctx.fill();
+  // рука с оружием смотрит на цель
+  const shx = sx, shy = sy - S * 0.68, ca = Math.cos(angle), sa = Math.sin(angle);
+  const hx = shx + ca * S * 0.32, hy = shy + sa * S * 0.32;
+  ctx.beginPath(); ctx.moveTo(shx, shy); ctx.lineTo(hx, hy); ctx.stroke();
+  ctx.strokeStyle = '#c9ced8'; ctx.lineWidth = lw * 1.6; ctx.lineCap = 'butt';
+  ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + ca * S * 0.22, hy + sa * S * 0.22); ctx.stroke();
+  if (flash) {
+    ctx.fillStyle = '#ffd36b';
+    ctx.beginPath(); ctx.arc(hx + ca * S * 0.27, hy + sa * S * 0.27, S * 0.06, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+  return [hx + ca * S * 0.24, hy + sa * S * 0.24];   // кончик ствола
+}
+
+function drawCrowd(k, force) {
+  k = Math.max(0, Math.min(N, k));
+  if (force || !crowd.geo) {
+    const dpr = window.devicePixelRatio || 1;
+    crowd.geo = crowdGeometry(); if (!crowd.geo) return;
+    cvs.width = Math.round(crowd.geo.W * dpr); cvs.height = Math.round(crowd.geo.H * dpr);
+    crowd.shots = []; crowd.dead = Math.max(0, crowd.k);
+  }
+  if (k === crowd.k) return;
+  const diff = k - crowd.k;
+  if (crowd.k >= 0 && diff > 0 && diff <= 3) {
+    const now = performance.now(), start = Math.max(now, ...crowd.shots.map(s => s.t0 + T_GAP));
+    for (let i = crowd.k; i < k; i++) crowd.shots.push({ n: i, t0: start + (i - crowd.k) * T_GAP });
+  } else { crowd.shots = []; crowd.dead = k; }   // большой скачок — без анимации
+  crowd.k = k;
+}
+
+function crowdFrame(now) {
+  requestAnimationFrame(crowdFrame);
+  const g = crowd.geo; if (!g) return;
+  const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, g.W, g.H);
+
+  // какие выстрелы закончились — человечек окончательно лежит
+  crowd.shots = crowd.shots.filter(s => {
+    if (now - s.t0 >= T_BULLET + T_FALL) { crowd.dead = Math.max(crowd.dead, s.n + 1); return false; }
+    return true;
+  });
+  const fall = {};
+  for (const s of crowd.shots) {
+    const t = now - s.t0 - T_BULLET;
+    fall[ORDER[s.n]] = t <= 0 ? 0 : Math.min(1, t / T_FALL);
+  }
+
+  // толпа
+  const lw = Math.max(1.5, g.s * 0.08);
+  g.people.forEach((p, i) => {
+    const rank = ORDER.indexOf(i);
+    if (rank < crowd.dead) {
+      ctx.fillStyle = 'rgba(192, 70, 70, 0.35)';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y - g.s * 0.04, g.s * 0.45, g.s * 0.07, 0, 0, 7); ctx.fill();
+      figure(p.x, p.y - g.s * 0.08, g.s, Math.PI / 2, '#6b6f7a', lw);
+    } else if (i in fall) {
+      const f = fall[i], e = f * f;
+      figure(p.x, p.y - g.s * 0.08 * e, g.s, e * Math.PI / 2, f > 0 ? '#e07a7a' : '#e8eaf0', lw);
+    } else {
+      figure(p.x, p.y, g.s, 0, '#e8eaf0', lw);
+    }
+  });
+
+  // цель: текущий выстрел или следующий по очереди
+  const shot = crowd.shots.find(s => now >= s.t0 - T_GAP * 0.6);
+  const n = shot ? shot.n : crowd.k;
+  let tip = null, flash = false, bullet = null;
+  if (n >= 0 && n < N) {
+    const p = g.people[ORDER[n]], tx = p.x, ty = p.y - g.s * 0.6;
+    if (!shot) {   // прицел на следующем
+      ctx.strokeStyle = 'rgba(255, 90, 90, 0.8)'; ctx.lineWidth = 1.5;
+      const r = g.s * 0.42;
+      ctx.beginPath(); ctx.arc(tx, ty, r, 0, 7);
+      ctx.moveTo(tx - r * 1.3, ty); ctx.lineTo(tx - r * 0.6, ty); ctx.moveTo(tx + r * 0.6, ty); ctx.lineTo(tx + r * 1.3, ty);
+      ctx.moveTo(tx, ty - r * 1.3); ctx.lineTo(tx, ty - r * 0.6); ctx.moveTo(tx, ty + r * 0.6); ctx.lineTo(tx, ty + r * 1.3);
+      ctx.stroke();
+    }
+    const want = Math.atan2(ty - (g.sy - g.S * 0.68), tx - g.sx);
+    crowd.aim += (want - crowd.aim) * 0.15;   // плавно поворачивает руку
+    const t = shot ? now - shot.t0 : -1;
+    flash = t >= 0 && t < 90;
+    if (t >= 0 && t < T_BULLET) bullet = { q: t / T_BULLET, tx, ty };
+  }
+  tip = drawShooter(g, crowd.aim, flash);
+  if (bullet) {
+    const bx = tip[0] + (bullet.tx - tip[0]) * bullet.q, by = tip[1] + (bullet.ty - tip[1]) * bullet.q;
+    ctx.fillStyle = '#ffd36b';
+    ctx.beginPath(); ctx.arc(bx, by, Math.max(2, g.S * 0.025), 0, 7); ctx.fill();
+  }
+}
+requestAnimationFrame(crowdFrame);
+new ResizeObserver(() => drawCrowd(crowd.k, true)).observe($('gridWrap'));
+
+const toMin = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+const dayLenMs = () => Math.max(1, (toMin(state.end) - toMin(state.start)) * 60000);
+const fmt = ms => {
+  const t = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60;
+  return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
+};
+
+function leftMs() {
+  if (state.mode === 'auto') {
+    const now = new Date();
+    const end = new Date(now); const [h, m] = state.end.split(':').map(Number);
+    end.setHours(h, m, 0, 0);
+    return Math.min(dayLenMs(), Math.max(0, end - now));
+  }
+  if (state.pausedLeft != null) return state.pausedLeft;
+  if (state.manualEndAt != null) return Math.max(0, state.manualEndAt - Date.now());
+  return parseLeftInput();
+}
+
+function parseLeftInput() {
+  const [h, m, s = 0] = ($('manualLeft').value || '0:0').split(':').map(Number);
+  return ((h * 60 + m) * 60 + s) * 1000;
+}
+
+function render() {
+  const left = leftMs();
+  const pct = Math.min(100, Math.max(0, (1 - left / dayLenMs()) * 100));
+  $('timer').textContent = fmt(left);
+  $('percent').textContent = pct.toFixed(2) + '%';
+  drawCrowd(Math.floor(pct));
+  $('ring').style.strokeDashoffset = C * (1 - pct / 100);
+  $('ring').classList.toggle('full', pct >= 100);
+  // 1% дня в минутах и секундах + сколько до следующего процента
+  const onePct = dayLenMs() / 100, ms = t => { const x = Math.round(t / 1000); return Math.floor(x / 60) + ' мин ' + String(x % 60).padStart(2, '0') + ' сек'; };
+  const toNext = left % onePct || onePct;
+  $('percentSub').innerHTML = '1% = <b>' + ms(onePct) + '</b>' +
+    (pct < 100 ? '<br>следующий через <b>' + ms(toNext) + '</b>' : '');
+
+  if (state.mode === 'auto') {
+    $('timerSub').textContent = left === 0 ? 'Рабочий день окончен 🎉' : 'до ' + state.end;
+  } else {
+    $('timerSub').textContent = state.pausedLeft != null ? 'на паузе'
+      : state.manualEndAt != null ? (left === 0 ? 'Готово 🎉' : 'идёт отсчёт') : 'задай время и нажми «Старт»';
+  }
+  document.title = Math.floor(pct) + '% · ' + fmt(left).slice(0, 5);
+}
+
+function applyMode() {
+  $('modeAuto').classList.toggle('on', state.mode === 'auto');
+  $('modeManual').classList.toggle('on', state.mode === 'manual');
+  $('manualBox').classList.toggle('hidden', state.mode !== 'manual');
+  $('pause').textContent = state.pausedLeft != null ? 'Продолжить' : 'Пауза';
+  render();
+}
+
+$('start').value = state.start; $('end').value = state.end;
+$('modeAuto').onclick = () => { state.mode = 'auto'; save(); applyMode(); };
+$('modeManual').onclick = () => { state.mode = 'manual'; save(); applyMode(); };
+$('start').onchange = e => { state.start = e.target.value; save(); render(); };
+$('end').onchange = e => { state.end = e.target.value; save(); render(); };
+$('manualLeft').oninput = () => { if (state.manualEndAt == null && state.pausedLeft == null) render(); };
+$('go').onclick = () => {
+  state.manualEndAt = Date.now() + parseLeftInput(); state.pausedLeft = null; save(); applyMode();
+};
+$('pause').onclick = () => {
+  if (state.pausedLeft != null) { state.manualEndAt = Date.now() + state.pausedLeft; state.pausedLeft = null; }
+  else if (state.manualEndAt != null) { state.pausedLeft = Math.max(0, state.manualEndAt - Date.now()); }
+  save(); applyMode();
+};
+
+applyMode();
+setInterval(render, 100);
+// ===== Крестики-нолики =====
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+const MISTAKE = 0.2;           // шанс, что компьютер сходит случайно (иначе его не победить)
+const game = { b: Array(9).fill(''), busy: false, score: { X: 0, O: 0, D: 0 } };
+try { Object.assign(game.score, JSON.parse(localStorage.getItem('tttScore')) || {}); } catch {}
+const cells = [];
+for (let i = 0; i < 9; i++) {
+  const c = document.createElement('button');
+  c.className = 'cell'; c.onclick = () => playerMove(i);
+  $('board').appendChild(c); cells.push(c);
+}
+
+function winner(b) {
+  for (const l of LINES) if (b[l[0]] && b[l[0]] === b[l[1]] && b[l[1]] === b[l[2]]) return { who: b[l[0]], line: l };
+  return b.every(Boolean) ? { who: 'D', line: [] } : null;
+}
+
+// Минимакс: O максимизирует, X минимизирует; быстрее победа — лучше
+function minimax(b, turn, depth) {
+  const w = winner(b);
+  if (w) return w.who === 'O' ? 10 - depth : w.who === 'X' ? depth - 10 : 0;
+  let best = turn === 'O' ? -Infinity : Infinity;
+  for (let i = 0; i < 9; i++) if (!b[i]) {
+    b[i] = turn;
+    const v = minimax(b, turn === 'O' ? 'X' : 'O', depth + 1);
+    b[i] = '';
+    best = turn === 'O' ? Math.max(best, v) : Math.min(best, v);
+  }
+  return best;
+}
+
+function aiMove() {
+  const free = game.b.map((v, i) => v ? -1 : i).filter(i => i >= 0);
+  if (Math.random() < MISTAKE) return free[Math.floor(Math.random() * free.length)];
+  let best = -Infinity, moves = [];
+  for (const i of free) {
+    game.b[i] = 'O'; const v = minimax(game.b, 'X', 1); game.b[i] = '';
+    if (v > best) { best = v; moves = [i]; } else if (v === best) moves.push(i);
+  }
+  return moves[Math.floor(Math.random() * moves.length)];
+}
+
+function paint() {
+  game.b.forEach((v, i) => {
+    cells[i].textContent = v === 'X' ? '✕' : v === 'O' ? '◯' : '';
+    cells[i].className = 'cell' + (v ? ' ' + v.toLowerCase() : '');
+    cells[i].disabled = !!v || game.busy;
+  });
+  $('sX').textContent = game.score.X; $('sO').textContent = game.score.O; $('sD').textContent = game.score.D;
+}
+
+function finish(w) {
+  game.busy = true;
+  game.score[w.who]++;
+  try { localStorage.setItem('tttScore', JSON.stringify(game.score)); } catch {}
+  paint();
+  w.line.forEach(i => cells[i].classList.add('win'));
+  setTimeout(() => {
+    $('result').textContent = w.who === 'X' ? 'Ты победил! 🎉' : w.who === 'O' ? 'Победил компьютер 🤖' : 'Ничья 🤝';
+    $('result').classList.add('show');
+    setTimeout(() => {
+      $('result').classList.remove('show');
+      game.b = Array(9).fill(''); game.busy = false; paint();
+    }, 1500);
+  }, 1000);
+}
+
+function playerMove(i) {
+  if (game.busy || game.b[i]) return;
+  game.b[i] = 'X';
+  let w = winner(game.b);
+  if (w) return finish(w);
+  game.busy = true; paint();
+  setTimeout(() => {
+    game.b[aiMove()] = 'O'; game.busy = false;
+    w = winner(game.b);
+    w ? finish(w) : paint();
+  }, 350);
+}
+
+// Поле ≈ 1/9 площади экрана: сторона = √(ширина × высота / 9)
+function sizeBoard() {
+  const side = Math.min(Math.sqrt(innerWidth * innerHeight / 9), innerWidth - 32);
+  $('boardWrap').style.width = side + 'px';
+  $('snakeWrap').style.width = side + 'px';
+  cells.forEach(c => c.style.fontSize = side / 5 + 'px');
+  if (window.snakeResize) snakeResize();
+}
+addEventListener('resize', sizeBoard);
+
+// ===== Змейка =====
+const SN = 20;                       // поле 20×20 клеток
+const sCvs = $('snake'), sCtx = sCvs.getContext('2d');
+const snake = { body: [], dir: [1, 0], queue: [], food: null, score: 0, state: 'idle', timer: null };
+try { snake.best = +localStorage.getItem('snakeBest') || 0; } catch { snake.best = 0; }
+
+function snakeReset() {
+  snake.body = [[9, 10], [8, 10], [7, 10]];
+  snake.dir = [1, 0]; snake.queue = []; snake.score = 0; snake.state = 'idle';
+  placeFood(); snakeDraw();
+}
+function placeFood() {
+  do { snake.food = [Math.floor(Math.random() * SN), Math.floor(Math.random() * SN)]; }
+  while (snake.body.some(([x, y]) => x === snake.food[0] && y === snake.food[1]));
+}
+function snakeStep() {
+  // берём следующий поворот из очереди (чтобы быстрые нажатия не терялись)
+  if (snake.queue.length) snake.dir = snake.queue.shift();
+  const [hx, hy] = snake.body[0];
+  const nx = hx + snake.dir[0], ny = hy + snake.dir[1];
+  const ate = nx === snake.food[0] && ny === snake.food[1];
+  const tail = ate ? snake.body : snake.body.slice(0, -1);
+  if (nx < 0 || ny < 0 || nx >= SN || ny >= SN || tail.some(([x, y]) => x === nx && y === ny)) return snakeOver();
+  snake.body = [[nx, ny], ...tail];
+  if (ate) { snake.score++; placeFood(); }
+  snakeDraw();
+}
+function snakeOver() {
+  clearInterval(snake.timer); snake.state = 'over';
+  if (snake.score > snake.best) {
+    snake.best = snake.score;
+    try { localStorage.setItem('snakeBest', snake.best); } catch {}
+  }
+  snakeDraw(true);
+  setTimeout(() => {
+    $('snResult').textContent = 'Игра окончена · счёт ' + snake.score;
+    $('snResult').classList.add('show');
+    setTimeout(() => { $('snResult').classList.remove('show'); snakeReset(); }, 1500);
+  }, 1000);
+}
+function snakeDraw(dead) {
+  const W = sCvs.width, c = W / SN, r = c * 0.25;
+  sCtx.clearRect(0, 0, W, W);
+  sCtx.fillStyle = 'rgba(255,255,255,0.025)';
+  for (let x = 0; x < SN; x++) for (let y = 0; y < SN; y++) if ((x + y) % 2) sCtx.fillRect(x * c, y * c, c, c);
+  // еда — песчинка
+  sCtx.fillStyle = '#e9c27a';
+  sCtx.beginPath(); sCtx.arc((snake.food[0] + 0.5) * c, (snake.food[1] + 0.5) * c, c * 0.32, 0, 7); sCtx.fill();
+  snake.body.forEach(([x, y], i) => {
+    sCtx.fillStyle = dead ? '#c0564f' : i === 0 ? '#8fc0ff' : '#4f9cff';
+    sCtx.beginPath(); sCtx.roundRect(x * c + 1, y * c + 1, c - 2, c - 2, r); sCtx.fill();
+  });
+  $('snScore').textContent = snake.score; $('snBest').textContent = snake.best;
+}
+window.snakeResize = () => {
+  const dpr = window.devicePixelRatio || 1, w = sCvs.clientWidth;
+  sCvs.width = Math.round(w * dpr); sCvs.height = sCvs.width;
+  if (snake.food) snakeDraw(snake.state === 'over');
+};
+
+const KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+addEventListener('keydown', e => {
+  const d = KEYS[e.key];
+  if (!d || e.target.tagName === 'INPUT') return;
+  // стрелки не прокручивают страницу, пока змейка видна на экране
+  const r = $('snakeWrap').getBoundingClientRect();
+  if (r.bottom < 0 || r.top > innerHeight) return;
+  e.preventDefault();
+  if (snake.state === 'over') return;
+  const last = snake.queue[snake.queue.length - 1] || snake.dir;
+  if (d[0] === -last[0] && d[1] === -last[1]) return;     // разворот на 180° запрещён
+  if (d[0] === last[0] && d[1] === last[1]) { if (snake.state === 'run') return; }
+  else if (snake.queue.length < 3) snake.queue.push(d);
+  if (snake.state === 'idle') { snake.state = 'run'; snake.timer = setInterval(snakeStep, 120); }
+});
+snakeResize(); snakeReset();
+sizeBoard(); paint();
+</script>
+</body>
+</html>
