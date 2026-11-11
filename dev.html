@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Песочница сцен</title>
+<link rel="stylesheet" href="core/style.css">
+<style>
+  body { height: auto; }
+  .dev { display: grid; gap: 12px; max-width: 1300px; margin: 0 auto; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .bar label { color: var(--muted); font-size: 14px; display: flex; gap: 6px; align-items: center; }
+  select, input[type=text] { background: var(--track); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; font-size: 14px; }
+  input[type=range] { width: 260px; }
+  .stage { position: relative; border: 1px dashed var(--border); border-radius: 12px; overflow: hidden; margin: 0 auto; }
+  .stage .scene { position: absolute; inset: 0; }
+  .info { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .info b { color: var(--text); }
+  .errs { color: #ff9b9b; font-size: 13px; white-space: pre-wrap; }
+  .sub b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="dev">
+  <h2 style="margin: 0">Песочница сцен</h2>
+  <div class="panel bar">
+    <label>Сцена <select id="pick"></select></label>
+    <label>или папка <input type="text" id="folder" placeholder="my-scene" size="12"></label>
+    <button class="btn" id="load">Открыть</button>
+  </div>
+  <div class="panel bar">
+    <label>Прошло <input type="range" id="pct" min="0" max="100" step="0.01" value="37"> <b id="pctv">37%</b></label>
+    <label>Скорость <select id="speed"><option value="0">пауза</option><option value="1">×1</option><option value="60" selected>×60</option><option value="600">×600</option></select></label>
+    <label>День, ч <select id="hours"><option>1</option><option>4</option><option selected>9</option><option>12</option></select></label>
+    <button class="btn" id="fast">Уйти пораньше 🏃</button>
+    <label>Экран <select id="size"><option value="390x470">телефон</option><option value="1240x420" selected>компьютер</option><option value="700x500">планшет</option></select></label>
+  </div>
+  <div class="stage" id="stage"></div>
+  <div class="panel info" id="info"></div>
+  <div class="errs" id="errs"></div>
+</div>
+<script src="core/host.js"></script>
+<script src="scenes/list.js"></script>
+<script>
+'use strict';
+// Песочница для авторов сцен: npm run dev → http://127.0.0.1:8080/dev.html
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+$('pick').replaceChildren(...[...window.SCENE_LIST, '_template'].map(f => new Option(f, f)));
+let sc = null, pct = 37, fast = null, last = performance.now();
+const dayLen = () => +$('hours').value * 3600000;
+
+function open(folder) {
+  if (!/^[a-z0-9_][a-z0-9_-]{0,30}$/.test(folder)) return alert('Имя папки: латиница, цифры, дефис');
+  history.replaceState(null, '', '?scene=' + folder);
+  $('stage').replaceChildren(); SceneFrame.all.length = 0; $('errs').textContent = '';
+  sc = new SceneFrame(folder, $('stage'));
+  sc.setVisible(true);
+}
+SceneFrame.onError = s => { $('errs').textContent = s.errors.map(e => '⚠ ' + e).join('\n'); };
+SceneFrame.onChange = () => {};
+$('load').onclick = () => open($('folder').value.trim() || $('pick').value);
+$('pick').onchange = () => { $('folder').value = ''; open($('pick').value); };
+$('pct').oninput = () => { pct = +$('pct').value; };
+function resize() { const [w, h] = $('size').value.split('x').map(Number); Object.assign($('stage').style, { width: Math.min(w, innerWidth - 40) + 'px', height: h + 'px' }); }
+$('size').onchange = resize;
+$('fast').onclick = () => {
+  if (fast) { pct = fast.from; fast = null; $('fast').textContent = 'Уйти пораньше 🏃'; return; }
+  const rest = Math.max(1, 300 - Math.floor(pct * 3)), per = Math.max(10, Math.min(400, 5000 / rest));
+  fast = { from: pct, per, t0: performance.now(), dur: rest * per }; $('fast').textContent = 'Вернуться 💼';
+};
+
+function tick() {
+  const now = performance.now(), dt = now - last; last = now;
+  const speed = +$('speed').value;
+  if (fast) pct = fast.from + (100 - fast.from) * Math.min(1, (now - fast.t0) / fast.dur);
+  else pct = Math.min(100, pct + dt * speed / dayLen() * 100);
+  $('pct').value = pct; $('pctv').textContent = pct.toFixed(2) + '%';
+  const len = dayLen(), left = len * (1 - pct / 100);
+  const rate = left <= 0 ? 0 : fast ? -(len * (100 - fast.from) / 100) / fast.dur : -speed;
+  if (!sc) return;
+  sc.tick({ left, len, rate, k: Math.floor(pct * 3 + 1e-9), pct, fast: fast ? { per: fast.per } : null });
+  const step = len / ((sc.meta && sc.meta.steps) || 300), subEl = document.createElement('div');
+  subEl.className = 'sub';
+  buildSub(subEl, { onePct: len / 100, short: false, scene: sc, pct, toNext: { step, left: left % step || step } });
+  const m = sc.meta;
+  $('info').innerHTML = '';
+  $('info').append(
+    Object.assign(document.createElement('div'), { textContent: m ? `Название: ${m.name} · автор: ${m.author || '—'} · частей в дне: ${m.steps}` : 'Сцена не вызвала registerScene…' }),
+    Object.assign(document.createElement('div'), { textContent: 'Подпись в шапке:' }), subEl,
+    Object.assign(document.createElement('div'), { id: 'cost', textContent: $('cost') ? $('cost').textContent : '' }));
+}
+setInterval(tick, 100);
+setInterval(async () => { if (sc) { const p = await sc.probe(); if (p && $('cost')) $('cost').textContent = `Кадр: ${p.frameCost} мс (тесты пропускают до 12 мс)`; } }, 1000);
+resize();
+open(params.get('scene') || window.SCENE_LIST[0]);
+$('pick').value = params.get('scene') || window.SCENE_LIST[0];
+</script>
+</body>
+</html>

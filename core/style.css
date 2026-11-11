@@ -1,0 +1,73 @@
+/* Ядро: шапка, футер, лента сцен. Менять может только владелец репозитория. */
+  :root {
+    --bg: #0f1115; --card: #181b22; --text: #e8eaf0; --muted: #8a90a0;
+    --track: #262a34; --accent: #4f9cff; --done: #3ddc97; --border: #2a2f3a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    padding: 16px;
+  }
+  .app { height: calc(100vh - 32px); height: calc(100dvh - 32px); display: flex; flex-direction: column; gap: 12px; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-wrap { flex: 1; min-height: 160px; position: relative; }
+  /* Лента инфографик: листается свайпом, каждая сцена на всю ширину */
+  .scenes {
+    position: absolute; inset: 0; display: flex; overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain;
+  }
+  .scenes::-webkit-scrollbar { display: none; }
+  .scene { flex: 0 0 100%; height: 100%; position: relative; scroll-snap-align: start; scroll-snap-stop: always; }
+  .nav { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: 13px; }
+  .nav .arrow { background: none; border: none; color: var(--muted); font-size: 22px; line-height: 1; padding: 0 8px; cursor: pointer; }
+  .nav .arrow:hover { color: var(--text); }
+  .dots { display: flex; gap: 6px; }
+  .dots button { width: 7px; height: 7px; padding: 0; border-radius: 50%; border: none; background: var(--track); cursor: pointer; }
+  .dots button.on { background: var(--accent); }
+  #sceneName { min-width: 70px; text-align: center; }
+  /* сцена — iframe-песочница, поверх неё прозрачный слой для свайпов */
+  .scene iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: transparent; }
+  .scene .touch { position: absolute; inset: 0; }
+  .scene-error { position: absolute; left: 8px; bottom: 8px; right: 8px; color: #ff9b9b; font-size: 12px; background: rgba(40, 10, 10, .85);
+    border: 1px solid #5a2a2a; border-radius: 8px; padding: 6px 10px; pointer-events: none; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 14px 20px;
+  }
+  .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+  .timer { font-size: 44px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .percent { font-size: 48px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 4px; text-align: center; line-height: 1.5; }
+  .sub b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
+  }
+  .field { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+  input[type=time] {
+    background: var(--track); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 8px; font-size: 15px; color-scheme: dark;
+  }
+  .btn { background: var(--track); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 14px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .hidden { display: none !important; }
+
+  /* Телефон */
+  @media (max-width: 700px) {
+    body { padding: 10px; }
+    .app { height: calc(100vh - 20px); height: calc(100dvh - 20px); gap: 8px; }
+    .cards { gap: 8px; }
+    .card { padding: 10px 8px; border-radius: 12px; }
+    .label { font-size: 10px; margin-bottom: 2px; }
+    .timer { font-size: 28px; }
+    .percent { font-size: 28px; }
+    .sub { font-size: 11px; line-height: 1.4; }
+    .nav { font-size: 12px; gap: 6px; }
+    .panel { padding: 8px 10px; gap: 8px; border-radius: 12px; }
+    .field { font-size: 13px; gap: 6px; }
+    input[type=time] { font-size: 14px; padding: 4px 6px; }
+    #leave { width: 100%; margin-left: 0 !important; padding: 10px; font-size: 15px; }
+  }

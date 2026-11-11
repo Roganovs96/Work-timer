@@ -1,0 +1,13 @@
+{
+  "name": "work-timer",
+  "private": true,
+  "description": "Таймер рабочего дня с листаемыми инфографиками",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 tests/static.test.js tests/scenes.test.js",
+    "test:static": "node --test tests/static.test.js",
+    "dev": "node tests/server.js 8080"
+  },
+  "devDependencies": {
+    "playwright": "1.49.1"
+  }
+}
