@@ -1,0 +1,45 @@
+name: Проверка сцен
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  rules:
+    name: PR меняет только свою сцену
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != github.repository_owner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: node tests/check-pr.js origin/${{ github.base_ref }}
+
+  tests:
+    name: Автотесты сцен
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - name: Итог в сводку
+        if: always()
+        run: |
+          if [ -f tests/output/summary.md ]; then
+            { echo "## Сцены"; cat tests/output/summary.md; echo; echo "Скриншоты — в артефакте **screenshots** ниже."; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: tests/output/
+          if-no-files-found: ignore

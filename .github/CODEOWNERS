@@ -1,0 +1,3 @@
+# Всё в репозитории одобряет владелец. Вместе с защитой ветки main
+# («Require review from Code Owners») ни один PR не попадёт на сайт без его approve.
+* @Roganovs96
