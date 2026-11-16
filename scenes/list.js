@@ -9,4 +9,5 @@ window.SCENE_LIST = [
   'shashlik',
   'derby',
   'salary',
+  'greenhouse',
 ];
