@@ -7,4 +7,6 @@ window.SCENE_LIST = [
   'train',
   'map',
   'shashlik',
+  'derby',
+  'salary',
 ];

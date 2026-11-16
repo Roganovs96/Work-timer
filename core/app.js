@@ -43,6 +43,7 @@ function drawNav() {
   $('sceneName').textContent = scenes[active] ? scenes[active].name : '';
 }
 SceneFrame.onChange = sc => { drawNav(); if (sc === scenes[active]) render(); };
+SceneFrame.onSwipe = (sc, dir) => { if (sc === scenes[active]) goTo(active + dir, true); };
 SceneFrame.onError = sc => {
   let box = sc.el.querySelector('.scene-error');
   if (!box) { box = document.createElement('div'); box.className = 'scene-error'; sc.el.appendChild(box); }

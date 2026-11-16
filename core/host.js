@@ -44,7 +44,10 @@ class SceneFrame {
         const words = Array.isArray(m.words) && m.words.length === 4 && m.words.every(w => str(w, 30)) ? m.words : null;
         if (m.words && !words) this.error('words: нужен массив из 4 строк до 30 символов');
         const steps = Number.isInteger(m.steps) && m.steps >= 1 && m.steps <= 10000 ? m.steps : 300;
-        this.meta = { name: m.name.trim(), author: str(m.author, 40) ? m.author : '', words, steps };
+        this.meta = { name: m.name.trim(), author: str(m.author, 40) ? m.author : '', words, steps, interactive: m.interactive === true };
+        // интерактивной сцене (поля ввода, кнопки) нужны настоящие нажатия: убираем слой для свайпов,
+        // листать ленту она будет сама, присылая { type: 'swipe' }
+        this.touch.style.display = this.meta.interactive ? 'none' : '';
         this.post({ type: 'visible', on: this.visible });
         if (this.lastTick) this.post(this.lastTick);
         SceneFrame.onChange(this);
@@ -64,6 +67,7 @@ class SceneFrame {
         break;
       }
       case 'error': this.error(m.message); break;
+      case 'swipe': if (this.meta && this.meta.interactive && (m.dir === 1 || m.dir === -1)) SceneFrame.onSwipe(this, m.dir); break;
       case 'probe': if (this.probes[m.id]) { this.probes[m.id](m); delete this.probes[m.id]; } break;
     }
   }
@@ -71,6 +75,7 @@ class SceneFrame {
 SceneFrame.all = [];
 SceneFrame.onChange = () => {};
 SceneFrame.onError = () => {};
+SceneFrame.onSwipe = () => {};
 SceneFrame.loadStore = () => ({});
 SceneFrame.saveStore = () => {};
 window.addEventListener('message', e => {
