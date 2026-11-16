@@ -20,7 +20,12 @@ css(`
   .chip small { display: block; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: rgba(242, 239, 230, 0.55); margin-top: 1px; }
   .phase { align-self: center; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: rgba(242, 239, 230, 0.7);
     padding: 4px 10px; border-radius: 10px; background: rgba(18, 24, 22, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); }
-  .done { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 7px; cursor: pointer;
+  .acts { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; align-items: stretch; }
+  .reset { min-width: 38px; padding: 0 11px; border-radius: 14px; cursor: pointer; color: rgba(242, 239, 230, 0.8);
+    background: rgba(18, 24, 22, 0.55); border: 1px solid rgba(255, 255, 255, 0.1); font: 600 15px -apple-system, sans-serif;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: background .2s, color .2s; white-space: nowrap; }
+  .reset.ask { background: rgba(200, 70, 60, 0.75); color: #fff; font-size: 13px; border-color: rgba(255, 160, 150, 0.4); }
+  .done { display: flex; align-items: center; gap: 7px; cursor: pointer;
     padding: 9px 15px 9px 11px; border-radius: 14px; border: 1px solid rgba(160, 240, 190, 0.35);
     background: linear-gradient(180deg, rgba(92, 196, 132, 0.85), rgba(52, 150, 96, 0.85)); color: #f4fff7;
     font: 650 14px -apple-system, sans-serif; letter-spacing: .01em;
@@ -41,7 +46,7 @@ css(`
   @media (max-width: 560px) {
     .hud { flex-direction: column; gap: 5px; } .phase { align-self: flex-start; }
     .chip { padding: 5px 10px 5px 8px; } .chip .v { font-size: 14px; }
-    .done { padding: 8px 12px 8px 9px; font-size: 13px; } .toast { top: auto; bottom: 18%; }
+    .done { padding: 8px 12px 8px 9px; font-size: 13px; } .reset { min-width: 34px; padding: 0 9px; } .toast { top: auto; bottom: 18%; }
   }
 `);
 html(`<div class="hud">
@@ -49,7 +54,8 @@ html(`<div class="hud">
   <div class="chip"><span class="ic">🦋</span><div><div class="v" id="tasks">0</div><small>задач сегодня</small></div></div>
   <div class="phase" id="phase">утро</div>
 </div>
-<button class="done" id="done"><span class="ck">✓</span>Выполнил задачу</button>
+<div class="acts"><button class="reset" id="reset" title="Сбросить задачи за сегодня">↺</button>
+<button class="done" id="done"><span class="ck">✓</span>Выполнил задачу</button></div>
 <div class="toast" id="toast"></div>`);
 
 // ===== Цвета и свет по ходу рабочего дня =====
@@ -575,12 +581,14 @@ function addButterfly(i, t0) {
 }
 function drawButterflies(g, now) {
   const start = [g.W / 2, g.beamY + 40];
+  garden.butterflies = garden.butterflies.filter(b => !b.leave || now - b.leave < 2500);
   for (const b of garden.butterflies) {
     const t = (now - b.t0) / 1000;
     const home = [g.W * (0.12 + 0.76 * b.hx), g.beamY + (g.benchY - g.beamY) * (0.25 + 0.55 * b.hy)];
     const fl = [Math.sin(t * b.sp + b.ph) * g.W * 0.07 + Math.sin(t * 1.9 * b.sp) * 8, Math.sin(t * 1.2 * b.sp + b.ph) * 22 + Math.sin(t * 2.7) * 4];
     const q = smooth(Math.min(1, t / 3));
-    const x = lerp(start[0], home[0] + fl[0], q), y = lerp(start[1], home[1] + fl[1], q) - Math.sin(Math.PI * q) * 30;
+    let x = lerp(start[0], home[0] + fl[0], q), y = lerp(start[1], home[1] + fl[1], q) - Math.sin(Math.PI * q) * 30;
+    if (b.leave) { const k = smooth(Math.min(1, (now - b.leave) / 2500)); x = lerp(x, g.W / 2, k); y = lerp(y, -20, k); }
     const flap = 0.25 + 0.75 * Math.abs(Math.sin(now / 90 + b.ph)), sz = Math.max(7, Math.min(12, g.W * 0.018));
     ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(t * b.sp + b.ph) * 0.3);
     for (const sd of [-1, 1]) {
@@ -619,6 +627,23 @@ $('done').onclick = () => {
   toast(msg);
   $('tasks').textContent = garden.tasks;
   const b = $('done'); b.classList.remove('glow'); void b.offsetWidth; b.classList.add('glow');
+};
+// Сброс: первое нажатие спрашивает, второе в течение 3 секунд — сбрасывает
+let askUntil = 0;
+$('reset').onclick = () => {
+  const btn = $('reset'), now = performance.now();
+  if (now > askUntil) {
+    askUntil = now + 3000; btn.textContent = 'Точно сбросить?'; btn.classList.add('ask');
+    setTimeout(() => { if (performance.now() >= askUntil) { btn.textContent = '↺'; btn.classList.remove('ask'); } }, 3050);
+    return;
+  }
+  askUntil = 0; btn.textContent = '↺'; btn.classList.remove('ask');
+  for (const b of garden.butterflies) b.leave = now;                  // бабочки улетают в окно
+  garden.seedlings = [];
+  garden.tasks = 0;
+  sceneStore.set('day', { date: today(), tasks: 0 });
+  $('tasks').textContent = 0;
+  toast('↺ Задачи за сегодня сброшены');
 };
 loadTasks();
 
