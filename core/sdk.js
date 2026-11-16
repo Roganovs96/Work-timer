@@ -111,7 +111,19 @@ let SCENE = null, visible = false, ticked = false, lastSub = '', sized = false, 
 function registerScene(def) {
   if (SCENE) throw new Error('registerScene вызван дважды');
   SCENE = def;
-  send({ type: 'ready', name: def.name, author: def.author, words: def.words, steps: def.steps });
+  send({ type: 'ready', name: def.name, author: def.author, words: def.words, steps: def.steps, interactive: def.interactive === true });
+  if (def.interactive) watchSwipes();
+}
+
+// Интерактивная сцена сама замечает горизонтальный свайп и просит ядро перелистнуть ленту
+function watchSwipes() {
+  let x0 = null, y0 = 0, t0 = 0;
+  addEventListener('touchstart', e => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; t0 = Date.now(); }, { passive: true });
+  addEventListener('touchend', e => {
+    if (x0 == null) return;
+    const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - t0 < 800) send({ type: 'swipe', dir: dx < 0 ? 1 : -1 });
+  }, { passive: true });
 }
 
 function reportError(message) { send({ type: 'error', message: String(message).slice(0, 300) }); }
