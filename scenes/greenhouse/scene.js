@@ -20,11 +20,14 @@ css(`
   .chip small { display: block; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: rgba(242, 239, 230, 0.55); margin-top: 1px; }
   .phase { align-self: center; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: rgba(242, 239, 230, 0.7);
     padding: 4px 10px; border-radius: 10px; background: rgba(18, 24, 22, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); }
-  .acts { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; align-items: stretch; }
-  .reset { min-width: 38px; padding: 0 11px; border-radius: 14px; cursor: pointer; color: rgba(242, 239, 230, 0.8);
-    background: rgba(18, 24, 22, 0.55); border: 1px solid rgba(255, 255, 255, 0.1); font: 600 15px -apple-system, sans-serif;
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: background .2s, color .2s; white-space: nowrap; }
-  .reset.ask { background: rgba(200, 70, 60, 0.75); color: #fff; font-size: 13px; border-color: rgba(255, 160, 150, 0.4); }
+  .acts { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .minor { display: flex; gap: 6px; }
+  .mini { padding: 5px 10px; border-radius: 11px; cursor: pointer; color: rgba(242, 239, 230, 0.85);
+    background: rgba(18, 24, 22, 0.55); border: 1px solid rgba(255, 255, 255, 0.1); font: 600 12px -apple-system, sans-serif;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: background .2s, color .2s, opacity .2s; white-space: nowrap; }
+  .mini:disabled { opacity: .35; cursor: default; }
+  .mini.ask { background: rgba(200, 70, 60, 0.8); color: #fff; border-color: rgba(255, 160, 150, 0.4); }
+  .mini .short { display: none; }
   .done { display: flex; align-items: center; gap: 7px; cursor: pointer;
     padding: 9px 15px 9px 11px; border-radius: 14px; border: 1px solid rgba(160, 240, 190, 0.35);
     background: linear-gradient(180deg, rgba(92, 196, 132, 0.85), rgba(52, 150, 96, 0.85)); color: #f4fff7;
@@ -46,7 +49,8 @@ css(`
   @media (max-width: 560px) {
     .hud { flex-direction: column; gap: 5px; } .phase { align-self: flex-start; }
     .chip { padding: 5px 10px 5px 8px; } .chip .v { font-size: 14px; }
-    .done { padding: 8px 12px 8px 9px; font-size: 13px; } .reset { min-width: 34px; padding: 0 9px; } .toast { top: auto; bottom: 18%; }
+    .done { padding: 8px 12px 8px 9px; font-size: 13px; }
+    .mini { padding: 4px 8px; font-size: 11px; } .mini .long { display: none; } .mini .short { display: inline; } .toast { top: auto; bottom: 18%; }
   }
 `);
 html(`<div class="hud">
@@ -54,8 +58,13 @@ html(`<div class="hud">
   <div class="chip"><span class="ic">🦋</span><div><div class="v" id="tasks">0</div><small>задач сегодня</small></div></div>
   <div class="phase" id="phase">утро</div>
 </div>
-<div class="acts"><button class="reset" id="reset" title="Сбросить задачи за сегодня">↺</button>
-<button class="done" id="done"><span class="ck">✓</span>Выполнил задачу</button></div>
+<div class="acts">
+  <button class="done" id="done"><span class="ck">✓</span>Выполнил задачу</button>
+  <div class="minor">
+    <button class="mini" id="shoo" disabled>🦋 <span class="long">Убрать бабочек</span><span class="short">Убрать</span></button>
+    <button class="mini" id="reset">↺ <span class="long">Сбросить задачи</span><span class="short">Сброс</span></button>
+  </div>
+</div>
 <div class="toast" id="toast"></div>`);
 
 // ===== Цвета и свет по ходу рабочего дня =====
@@ -143,7 +152,9 @@ function petalRing(n, len, wid, c1, c2, rot = 0) {
   for (let i = 0; i < n; i++) {
     ctx.save(); ctx.rotate(rot + i / n * Math.PI * 2);
     const gr = ctx.createLinearGradient(0, 0, 0, -len); gr.addColorStop(0, c1); gr.addColorStop(1, c2);
-    ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(0, -len / 2, wid, len / 2, 0, 0, 7); ctx.fill(); ctx.restore();
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(0, -len / 2, wid, len / 2, 0, 0, 7); ctx.fill();
+    if (len > 6) { ctx.strokeStyle = 'rgba(40, 10, 20, 0.22)'; ctx.lineWidth = 0.8; ctx.stroke(); }
+    ctx.restore();
   }
 }
 function pot(x, y, s, style) {
@@ -167,10 +178,10 @@ const PLANT = {
     stem(0, -2, tipX, tipY, -H * 0.25 * st, Math.max(1.2, s * 0.05), '#6a8f4a');
     for (let i = 0; i < 5; i++) {                                   // цветки раскрываются по очереди вдоль стрелки
       const q = 0.35 + i * 0.15, open = Math.max(0, Math.min(1, (g - 0.62 - i * 0.07) / 0.18)); if (st < q) continue;
-      const fx = tipX * q * 1.05 - H * 0.08 * Math.sin(q * 3), fy = tipY * q, sz = s * 0.42 * (0.35 + 0.65 * open);
+      const fx = tipX * q * 1.05 - H * 0.08 * Math.sin(q * 3), fy = tipY * q, sz = s * 0.66 * (0.35 + 0.65 * open);
       ctx.save(); ctx.translate(fx, fy);
       if (open <= 0.05) { ctx.fillStyle = '#d9c6e8'; ctx.beginPath(); ctx.ellipse(0, 0, s * 0.08, s * 0.11, 0, 0, 7); ctx.fill(); }
-      else { petalRing(5, sz, sz * 0.42, '#f6eef8', '#ffffff'); ctx.fillStyle = '#c2386f'; ctx.beginPath(); ctx.ellipse(0, sz * 0.2, sz * 0.22, sz * 0.3, 0, 0, 7); ctx.fill();
+      else { petalRing(5, sz, sz * 0.44, '#d0217a', '#ff9ccd'); ctx.fillStyle = '#7a0f45'; ctx.beginPath(); ctx.ellipse(0, sz * 0.2, sz * 0.22, sz * 0.3, 0, 0, 7); ctx.fill();
         ctx.fillStyle = '#ffd36b'; ctx.beginPath(); ctx.arc(0, -sz * 0.05, sz * 0.09, 0, 7); ctx.fill(); }
       ctx.restore();
     }
@@ -226,12 +237,12 @@ const PLANT = {
     const b = Math.max(0, (g - 0.7) / 0.3); if (b <= 0) return;       // цветонос с колокольчиками
     const tx = s * 0.4, ty = -R - H * 0.6 * b;
     stem(0, -R * 0.4, tx, ty, s * 0.3, Math.max(1, s * 0.04), '#c27a6a');
-    for (let i = 0; i < 4; i++) { const q2 = 0.6 + i * 0.12; ctx.fillStyle = '#ff8a5c'; ctx.beginPath(); ctx.ellipse(tx * q2 + s * 0.08 * (i % 2 ? 1 : -1), -R * 0.4 + (ty + R * 0.4) * q2, s * 0.07 * b, s * 0.1 * b, 0, 0, 7); ctx.fill(); }
+    for (let i = 0; i < 4; i++) { const q2 = 0.6 + i * 0.12; ctx.fillStyle = '#ff8a5c'; ctx.beginPath(); ctx.ellipse(tx * q2 + s * 0.1 * (i % 2 ? 1 : -1), -R * 0.4 + (ty + R * 0.4) * q2, s * 0.11 * b, s * 0.15 * b, 0, 0, 7); ctx.fill(); }
   },
   tulip(g, s, H, t) { bulbFlower(g, s, H, (open, sz) => {
-    for (const [a, c] of [[-0.42, '#e8435e'], [0.42, '#e8435e'], [0, '#ff6b7f']]) {
+    for (const [a, c] of [[-0.42, '#ff1f4b'], [0.42, '#ff1f4b'], [0, '#ff4f6e']]) {
       ctx.save(); ctx.rotate(a * (0.3 + 0.7 * open));
-      const gr = ctx.createLinearGradient(0, 0, 0, -sz * 1.1); gr.addColorStop(0, '#b8203a'); gr.addColorStop(1, c);
+      const gr = ctx.createLinearGradient(0, 0, 0, -sz * 1.1); gr.addColorStop(0, '#ffcc33'); gr.addColorStop(0.3, '#d1002f'); gr.addColorStop(1, c);
       ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(0, -sz * 0.55, sz * 0.36, sz * 0.6, 0, 0, 7); ctx.fill(); ctx.restore();
     } }, [[-2.5, 0.9], [-0.7, 0.85]]); },
   peacelily(g, s, H, t) {
@@ -242,7 +253,7 @@ const PLANT = {
     for (const [dx, h] of [[-0.25, 0.95], [0.3, 0.8]]) {
       const tx = dx * s * 2, ty = -H * h * Math.min(1, b * 1.5);
       stem(0, -2, tx, ty, dx * s, Math.max(1.2, s * 0.045), '#4c8a46');
-      const sz = s * 0.55 * Math.min(1, b * 1.2);
+      const sz = s * 0.85 * Math.min(1, b * 1.2);
       ctx.save(); ctx.translate(tx, ty);
       const gr = ctx.createLinearGradient(0, 0, 0, -sz * 1.6); gr.addColorStop(0, '#dfe9d8'); gr.addColorStop(1, '#ffffff');
       ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(-sz * 0.7, -sz * 0.4, -sz * 0.4, -sz * 1.3, 0, -sz * 1.6);
@@ -256,10 +267,10 @@ const PLANT = {
     for (const [a, l] of [[-2.6, 0.8], [-0.5, 0.8], [-2.0, 0.7], [-1.1, 0.7]]) leaf(0, -H * 0.15 * q, a, s * 0.95 * l * q, s * 0.34 * q, '#2f6b3a', '#5d9a55');
     stem(0, 0, 0, -H * 0.5 * q, s * 0.1, Math.max(1.3, s * 0.06));
     const b = Math.max(0, (g - 0.5) / 0.5); if (b <= 0) return;
-    const R = s * 0.75 * (0.25 + 0.75 * b), cy = -H * 0.5 * q - R * 0.6, r2 = rng(Math.round(s * 13));
-    for (let i = 0; i < 26; i++) {                                    // шапка из маленьких цветков
+    const R = s * 1.15 * (0.25 + 0.75 * b), cy = -H * 0.5 * q - R * 0.6, r2 = rng(Math.round(s * 13));
+    for (let i = 0; i < 38; i++) {                                    // шапка из маленьких цветков
       const a = r2() * Math.PI * 2, d = Math.sqrt(r2()) * R, fx = Math.cos(a) * d, fy = cy + Math.sin(a) * d * 0.85;
-      const c = i % 3 ? '#7fa6f0' : '#b59cf2', fs = R * 0.2;
+      const c = ['#4f7dff', '#8f5cff', '#ff6fc0', '#5aa0ff'][i % 4], fs = R * 0.22;
       ctx.save(); ctx.translate(fx, fy); ctx.rotate(a);
       ctx.fillStyle = c; for (let k = 0; k < 4; k++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.ellipse(0, -fs * 0.45, fs * 0.32, fs * 0.45, 0, 0, 7); ctx.fill(); }
       ctx.fillStyle = '#eef'; ctx.beginPath(); ctx.arc(0, 0, fs * 0.12, 0, 7); ctx.fill(); ctx.restore();
@@ -272,10 +283,10 @@ const PLANT = {
       leaf(ex, ey, a + 0.6, s * 1.0 * q, s * 0.36 * q, '#1f5a2c', '#3f8a45');
     }
     const b = Math.max(0, (g - 0.5) / 0.5); if (b <= 0) return;
-    const tx = s * 0.35, ty = -H * 0.9 * Math.min(1, b * 1.4), sz = s * 0.55 * Math.min(1, b * 1.2);
+    const tx = s * 0.35, ty = -H * 0.9 * Math.min(1, b * 1.4), sz = s * 0.85 * Math.min(1, b * 1.2);
     stem(0, -2, tx, ty, -s * 0.4, Math.max(1.2, s * 0.045), '#4c8a46');
     ctx.save(); ctx.translate(tx, ty); ctx.rotate(-0.3);
-    const gr = ctx.createRadialGradient(-sz * 0.2, -sz * 0.3, 0, 0, 0, sz * 1.2); gr.addColorStop(0, '#ff6a6a'); gr.addColorStop(1, '#b3122a');
+    const gr = ctx.createRadialGradient(-sz * 0.2, -sz * 0.3, 0, 0, 0, sz * 1.2); gr.addColorStop(0, '#ff5a4a'); gr.addColorStop(1, '#a0001c');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(0, sz * 0.5); ctx.bezierCurveTo(-sz * 1.1, -sz * 0.1, -sz * 0.6, -sz * 1.1, 0, -sz * 0.6);
     ctx.bezierCurveTo(sz * 0.6, -sz * 1.1, sz * 1.1, -sz * 0.1, 0, sz * 0.5); ctx.fill();
     ctx.strokeStyle = '#f2d36b'; ctx.lineWidth = Math.max(2, sz * 0.16); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, -sz * 0.1); ctx.lineTo(sz * 0.25, -sz * 0.75); ctx.stroke();
@@ -284,13 +295,13 @@ const PLANT = {
   sunflower(g, s, H, t) { bulbFlower(g, s, H, (open, sz) => {
     petalRing(20, sz * 1.15, sz * 0.17, '#e8a317', '#ffd447'); petalRing(14, sz * 0.9, sz * 0.15, '#e39a12', '#ffcd3c', 0.2);
     const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, sz * 0.5); gr.addColorStop(0, '#3b2412'); gr.addColorStop(1, '#6b3f1f');
-    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, sz * 0.48, 0, 7); ctx.fill(); }, [[-2.6, 1.1], [-0.55, 1.1], [-2.2, 0.8], [-0.95, 0.8]], 1.5); },
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, sz * 0.48, 0, 7); ctx.fill(); }, [[-2.6, 1.1], [-0.55, 1.1], [-2.2, 0.8], [-0.95, 0.8]], 1.2); },
   lavender(g, s, H, t) {
     for (let k = -3; k <= 3; k++) {
       const q = Math.min(1, g / 0.6), tx = k * s * 0.18, ty = -H * (0.75 + 0.2 * Math.cos(k)) * q;
       stem(0, 0, tx, ty, k * 2, Math.max(1, s * 0.03), '#6f9a6a');
       const b = Math.max(0, (g - 0.6) / 0.4);
-      for (let i = 0; i < 7; i++) { ctx.fillStyle = i % 2 ? '#9a7fe0' : '#b39af0'; ctx.beginPath(); ctx.ellipse(tx + (i % 2 ? 1.5 : -1.5), ty + i * s * 0.09, s * 0.06 * (0.3 + 0.7 * b), s * 0.08 * (0.3 + 0.7 * b), 0, 0, 7); ctx.fill(); }
+      for (let i = 0; i < 7; i++) { ctx.fillStyle = i % 2 ? '#7c3aed' : '#a78bfa'; ctx.beginPath(); ctx.ellipse(tx + (i % 2 ? 2 : -2), ty + i * s * 0.11, s * 0.09 * (0.3 + 0.7 * b), s * 0.11 * (0.3 + 0.7 * b), 0, 0, 7); ctx.fill(); }
     }
   },
   rose(g, s, H, t) {
@@ -299,9 +310,9 @@ const PLANT = {
     for (let i = 0; i < 6; i++) leaf(0, -H * q * (0.2 + i * 0.12), i % 2 ? -0.4 : -2.7, s * 0.55 * q, s * 0.22 * q, '#2a5e30', '#4f8a48');
     const b = Math.max(0, (g - 0.55) / 0.45); if (b <= 0) return;
     for (const [dx, dy, k] of [[0, -H * q, 1], [-s * 0.45, -H * q * 0.72, 0.75], [s * 0.4, -H * q * 0.6, 0.65]]) {
-      const sz = s * 0.42 * k * (0.35 + 0.65 * b);
+      const sz = s * 0.66 * k * (0.35 + 0.65 * b);
       ctx.save(); ctx.translate(dx, dy);
-      for (let r = 3; r >= 1; r--) { ctx.fillStyle = r % 2 ? '#c81d3a' : '#e8435e'; ctx.beginPath(); ctx.arc(0, 0, sz * r / 3, 0, 7); ctx.fill(); }
+      for (let r = 3; r >= 1; r--) { ctx.fillStyle = r % 2 ? '#c8002e' : '#ff2e5a'; ctx.beginPath(); ctx.arc(0, 0, sz * r / 3, 0, 7); ctx.fill(); }
       ctx.strokeStyle = 'rgba(80, 0, 20, 0.4)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(-sz * 0.1, 0, sz * 0.45, 0.5, 3.6); ctx.stroke();
       ctx.restore();
     }
@@ -314,7 +325,7 @@ const PLANT = {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)'; ctx.lineWidth = 0.8; ctx.beginPath();
     for (let yy = -h + 6; yy < -3; yy += 7) { ctx.moveTo(-w * 0.4, yy); ctx.lineTo(-w * 0.75, yy - 2); ctx.moveTo(w * 0.4, yy); ctx.lineTo(w * 0.75, yy - 2); } ctx.stroke();
     const b = Math.max(0, (g - 0.65) / 0.35); if (b <= 0) return;
-    ctx.save(); ctx.translate(0, -h); petalRing(10, s * 0.45 * b, s * 0.11, '#ff4f9a', '#ffb0d4');
+    ctx.save(); ctx.translate(0, -h); petalRing(12, s * 0.7 * b, s * 0.15, '#ff1f8a', '#ffb0d4');
     ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(0, 0, s * 0.1, 0, 7); ctx.fill(); ctx.restore();
   },
 };
@@ -327,7 +338,7 @@ function bulbFlower(g, s, H, drawHead, leaves, k = 1) {
   const bud = Math.max(0, Math.min(1, (g - 0.6) / 0.2)), open = Math.max(0, (g - 0.78) / 0.22); if (bud <= 0) return;
   ctx.save(); ctx.translate(0, -H * st);
   if (open <= 0) { ctx.fillStyle = '#5d9a55'; ctx.beginPath(); ctx.ellipse(0, -s * 0.18 * bud, s * 0.13 * bud * k, s * 0.24 * bud * k, 0, 0, 7); ctx.fill(); }
-  else drawHead(smooth(open), s * 0.5 * k * (0.5 + 0.5 * smooth(open)));
+  else drawHead(smooth(open), s * 0.82 * k * (0.5 + 0.5 * smooth(open)));
   ctx.restore();
 }
 
@@ -392,6 +403,10 @@ function renderBackground(g, L, p) {
   for (let y = floorY + 6, d = 6; y < H; d *= 1.5, y += d) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
   ctx.stroke();
   ctx.fillStyle = 'rgba(0, 0, 0, 0.25)'; ctx.fillRect(0, floorY, W, 3);
+  // стена за растениями чуть темнее и спокойнее — растения главные
+  const band = ctx.createLinearGradient(0, beamY + (benchY - beamY) * 0.1, 0, benchY);
+  band.addColorStop(0, 'rgba(14, 26, 20, 0)'); band.addColorStop(0.55, 'rgba(14, 26, 20, 0.28)'); band.addColorStop(1, 'rgba(14, 26, 20, 0.42)');
+  ctx.fillStyle = band; ctx.fillRect(g.bx0 - 30, beamY, g.bx1 - g.bx0 + 60, benchY - beamY);
   // полки на стеклянной стене со своими горшочками
   for (const sh of g.shelves) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.25)'; ctx.fillRect(sh.x + 3, sh.y + 4, sh.w, 6);
@@ -510,6 +525,21 @@ function drawBigPlant(g, now) {
   ctx.fillStyle = '#5a626e'; ctx.fillRect(x - s * 0.4, y - s * 0.62, s * 0.8, s * 0.06);
 }
 
+// мягкое локальное освещение над раскрывшимися цветками
+const HEAD_AT = { orchid: 0.75, succulent: 0.35, tulip: 0.95, peacelily: 0.85, hydrangea: 0.6, anthurium: 0.85, sunflower: 0.95, lavender: 0.75, rose: 0.85, cactus: 0.75 };
+function drawSpots(g, p, now) {
+  ctx.save(); ctx.globalCompositeOperation = 'screen';
+  for (const pl of g.plants) {
+    const k = HEAD_AT[pl.kind]; if (!k) continue;
+    const b = Math.max(0, (growth(pl.rank, g.n, p) - 0.75) / 0.25); if (b <= 0) continue;
+    const x = pl.x, y = pl.y - pl.s - pl.maxH * k, r = pl.s * 2.4;
+    const a = 0.16 * b * (0.9 + 0.1 * Math.sin(now / 1500 + pl.ph));
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(255, 244, 220, ${a})`); gr.addColorStop(1, 'rgba(255, 244, 220, 0)');
+    ctx.fillStyle = gr; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  ctx.restore();
+}
+
 // лучи солнца сквозь стекло
 function drawRays(g, L, p, now) {
   if (L.rays <= 0.01) return;
@@ -573,6 +603,82 @@ function drawLadybug(g, now) {
   ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(x + 3, y - 1, 1.5, 0, 7); ctx.arc(x - 1, y - 2, 0.8, 0, 7); ctx.arc(x - 2.5, y - 0.8, 0.7, 0, 7); ctx.fill();
 }
 
+// ===== Кот: награда за третью задачу =====
+// Рыжий полосатый кот приходит справа, садится на пол перед грядкой, моргает и машет хвостом,
+// время от времени сворачивается клубком и дремлет.
+function catSpot(g) { return [g.phone ? g.W * 0.3 : g.W * 0.23, g.H - (g.H - g.floorY) * 0.3]; }
+function drawCat(g, now) {
+  const c = garden.cat; if (!c) return;
+  const [hx, hy] = catSpot(g), s = Math.min(g.H * 0.13, 52), t = now - c.t0;
+  let x = hx, pose = 'sit', dir = -1;
+  if (c.leave) { const q = Math.min(1, (now - c.leave) / 3000); x = lerp(hx, g.W + s * 2, smooth(q)); pose = 'walk'; dir = 1; }
+  else if (t < 3000) { x = lerp(g.W + s * 2, hx, smooth(t / 3000)); pose = 'walk'; }
+  else if ((t / 1000) % 70 > 42) pose = 'sleep';
+  // появление: мягкое сияние на месте
+  if (!c.leave && t > 2600 && t < 4600) {
+    const q = (t - 2600) / 2000, gr = ctx.createRadialGradient(hx, hy - s * 0.5, 0, hx, hy - s * 0.5, s * 1.6);
+    gr.addColorStop(0, `rgba(255, 230, 170, ${0.45 * (1 - q)})`); gr.addColorStop(1, 'rgba(255,230,170,0)');
+    ctx.fillStyle = gr; ctx.fillRect(hx - s * 1.6, hy - s * 2.1, s * 3.2, s * 3.2);
+  }
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.28)'; ctx.beginPath(); ctx.ellipse(x, hy + 1, s * 0.55, s * 0.1, 0, 0, 7); ctx.fill();
+  ctx.save(); ctx.translate(x, hy); ctx.scale(dir, 1);
+  cat(s, pose, now);
+  ctx.restore();
+}
+function cat(s, pose, now) {
+  const fur = '#d98b4a', dark = '#9e5a2a', cream = '#f3dcc0', t = now / 1000;
+  const blink = (t % 4.3) < 0.14, tail = Math.sin(t * 1.6) * 0.18;
+  const furG = (x0, y0, x1, y1) => { const g = ctx.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, '#e9a066'); g.addColorStop(1, '#c4743a'); return g; };
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const head = (hx, hy, r, closed) => {
+    ctx.fillStyle = fur;
+    for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(hx + sd * r * 0.85, hy - r * 0.35); ctx.lineTo(hx + sd * r * 0.62, hy - r * 1.2); ctx.lineTo(hx + sd * r * 0.12, hy - r * 0.8); ctx.fill();
+      ctx.fillStyle = '#f2b8a0'; ctx.beginPath(); ctx.moveTo(hx + sd * r * 0.68, hy - r * 0.5); ctx.lineTo(hx + sd * r * 0.6, hy - r * 0.98); ctx.lineTo(hx + sd * r * 0.3, hy - r * 0.75); ctx.fill(); ctx.fillStyle = fur; }
+    ctx.fillStyle = furG(hx, hy - r, hx, hy + r); ctx.beginPath(); ctx.ellipse(hx, hy, r, r * 0.88, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = cream; ctx.beginPath(); ctx.ellipse(hx, hy + r * 0.38, r * 0.5, r * 0.36, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = dark; ctx.lineWidth = Math.max(1, r * 0.08);
+    ctx.beginPath(); for (const dx of [-0.25, 0, 0.25]) { ctx.moveTo(hx + dx * r, hy - r * 0.82); ctx.lineTo(hx + dx * r * 0.8, hy - r * 0.5); } ctx.stroke();
+    if (closed) { ctx.strokeStyle = '#3b2a20'; ctx.lineWidth = Math.max(1, r * 0.07); ctx.beginPath(); ctx.arc(hx - r * 0.35, hy - r * 0.05, r * 0.16, 0.2, Math.PI - 0.2); ctx.moveTo(hx + r * 0.51, hy - r * 0.05); ctx.arc(hx + r * 0.35, hy - r * 0.05, r * 0.16, 0.2, Math.PI - 0.2); ctx.stroke(); }
+    else for (const sd of [-1, 1]) { ctx.fillStyle = '#5f8f3a'; ctx.beginPath(); ctx.ellipse(hx + sd * r * 0.35, hy - r * 0.08, r * 0.15, r * 0.18, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1b1b18'; ctx.beginPath(); ctx.ellipse(hx + sd * r * 0.35, hy - r * 0.08, r * 0.05, r * 0.15, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.beginPath(); ctx.arc(hx + sd * r * 0.31, hy - r * 0.14, r * 0.04, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#e8879a'; ctx.beginPath(); ctx.moveTo(hx - r * 0.09, hy + r * 0.2); ctx.lineTo(hx + r * 0.09, hy + r * 0.2); ctx.lineTo(hx, hy + r * 0.3); ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)'; ctx.lineWidth = 0.7; ctx.beginPath();
+    for (const sd of [-1, 1]) for (const dy of [-0.04, 0.08]) { ctx.moveTo(hx + sd * r * 0.25, hy + r * 0.3); ctx.lineTo(hx + sd * r * 1.15, hy + r * (0.25 + dy)); } ctx.stroke();
+  };
+  if (pose === 'sleep') {                                           // клубочек, дышит, над ним «z»
+    const br = 1 + 0.035 * Math.sin(t * 2);
+    ctx.strokeStyle = dark; ctx.lineWidth = s * 0.13; ctx.beginPath(); ctx.moveTo(-s * 0.5, -s * 0.12); ctx.quadraticCurveTo(-s * 0.2, s * 0.02, s * 0.35, -s * 0.06); ctx.stroke();
+    ctx.fillStyle = furG(0, -s * 0.5, 0, 0); ctx.beginPath(); ctx.ellipse(-s * 0.05, -s * 0.24 * br, s * 0.52, s * 0.26 * br, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = dark; ctx.lineWidth = Math.max(1, s * 0.04); ctx.beginPath(); for (const dx of [-0.3, -0.12, 0.06]) { ctx.moveTo(dx * s, -s * 0.46); ctx.lineTo(dx * s + s * 0.04, -s * 0.3); } ctx.stroke();
+    head(s * 0.34, -s * 0.24, s * 0.21, true);
+    ctx.fillStyle = 'rgba(232, 234, 240, 0.7)'; ctx.font = `600 ${s * 0.22}px -apple-system, sans-serif`;
+    const zq = (t % 3) / 3; ctx.globalAlpha = 1 - zq; ctx.fillText('z', s * 0.45 + zq * s * 0.3, -s * 0.6 - zq * s * 0.5); ctx.globalAlpha = 1;
+    return;
+  }
+  if (pose === 'walk') {                                           // идёт: шаги и хвост трубой
+    const ph = t * 8, bob = Math.abs(Math.sin(ph)) * s * 0.03;
+    ctx.strokeStyle = fur; ctx.lineWidth = s * 0.11;
+    ctx.beginPath(); for (const [lx, o] of [[-0.3, 0], [-0.18, Math.PI], [0.22, Math.PI], [0.34, 0]]) { ctx.moveTo(lx * s, -s * 0.32); ctx.lineTo(lx * s + Math.sin(ph + o) * s * 0.08, 0); } ctx.stroke();
+    ctx.strokeStyle = dark; ctx.lineWidth = s * 0.1; ctx.beginPath(); ctx.moveTo(s * 0.4, -s * 0.5); ctx.quadraticCurveTo(s * 0.65, -s * 0.75, s * 0.55, -s * (1 + tail * 0.3)); ctx.stroke();
+    ctx.fillStyle = furG(0, -s * 0.65, 0, -s * 0.25); ctx.beginPath(); ctx.ellipse(0, -s * 0.45 - bob, s * 0.45, s * 0.19, 0, 0, 7); ctx.fill();
+    head(-s * 0.48, -s * 0.66 - bob, s * 0.21, false);
+    return;
+  }
+  // сидит: хвост обвивает лапы и покачивается кончиком
+  ctx.strokeStyle = dark; ctx.lineWidth = s * 0.12;
+  ctx.beginPath(); ctx.moveTo(s * 0.25, -s * 0.08); ctx.quadraticCurveTo(s * 0.55, -s * 0.02, s * 0.5, -s * 0.28);
+  ctx.quadraticCurveTo(s * (0.46 + tail * 0.3), -s * 0.5, s * (0.62 + tail), -s * 0.58); ctx.stroke();
+  ctx.fillStyle = furG(0, -s * 0.7, 0, 0); ctx.beginPath(); ctx.ellipse(s * 0.1, -s * 0.28, s * 0.32, s * 0.28, 0, 0, 7); ctx.fill();   // бедро
+  ctx.beginPath(); ctx.ellipse(-s * 0.08, -s * 0.48, s * 0.22, s * 0.32, -0.15, 0, 7); ctx.fill();                                     // грудь
+  ctx.fillStyle = cream; ctx.beginPath(); ctx.ellipse(-s * 0.16, -s * 0.46, s * 0.12, s * 0.24, -0.15, 0, 7); ctx.fill();
+  ctx.fillStyle = fur; for (const lx of [-0.22, -0.04]) { ctx.beginPath(); ctx.roundRect(lx * s - s * 0.06, -s * 0.34, s * 0.12, s * 0.34, s * 0.06); ctx.fill(); }
+  ctx.fillStyle = cream; for (const lx of [-0.22, -0.04]) { ctx.beginPath(); ctx.ellipse(lx * s, -s * 0.02, s * 0.07, s * 0.04, 0, 0, 7); ctx.fill(); }
+  ctx.strokeStyle = dark; ctx.lineWidth = Math.max(1, s * 0.04); ctx.beginPath();
+  for (const a of [-0.6, -0.1, 0.4]) { ctx.moveTo(s * 0.1 + Math.cos(a - 1.6) * s * 0.3, -s * 0.28 + Math.sin(a - 1.6) * s * 0.26); ctx.lineTo(s * 0.1 + Math.cos(a - 1.6) * s * 0.18, -s * 0.28 + Math.sin(a - 1.6) * s * 0.15); } ctx.stroke();
+  head(-s * 0.12, -s * 0.86, s * 0.25, blink);
+}
+
 // ===== Бабочки за выполненные задачи =====
 const WINGS = [['#ff9f43', '#ffd36b'], ['#4f9cff', '#a5d0ff'], ['#ff6fae', '#ffc1dc'], ['#a78bfa', '#e0d4ff'], ['#3ddc97', '#c6f5df'], ['#ffd36b', '#fff2c2']];
 function addButterfly(i, t0) {
@@ -582,6 +688,7 @@ function addButterfly(i, t0) {
 function drawButterflies(g, now) {
   const start = [g.W / 2, g.beamY + 40];
   garden.butterflies = garden.butterflies.filter(b => !b.leave || now - b.leave < 2500);
+  if (garden.cat && garden.cat.leave && now - garden.cat.leave > 3000) garden.cat = null;
   for (const b of garden.butterflies) {
     const t = (now - b.t0) / 1000;
     const home = [g.W * (0.12 + 0.76 * b.hx), g.beamY + (g.benchY - g.beamY) * (0.25 + 0.55 * b.hy)];
@@ -605,44 +712,73 @@ function drawButterflies(g, now) {
 }
 
 // ===== Задачи: бабочка, а каждая третья — ещё и росток на полке =====
-function loadTasks() {
+// Состояние дня: задачи, сколько бабочек видно, пришёл ли кот. Ростки на полках — постоянная коллекция.
+function readDay() {
   const st = sceneStore.get('day', null);
-  garden.tasks = st && st.date === today() ? Math.min(999, st.tasks | 0) : 0;
+  if (!st || st.date !== today()) return { tasks: 0, bflies: 0, cat: false };
+  const tasks = Math.min(999, st.tasks | 0);
+  return { tasks, bflies: Math.min(tasks, st.bflies == null ? tasks : st.bflies | 0), cat: st.cat == null ? tasks >= 3 : !!st.cat };
+}
+function saveDay() { sceneStore.set('day', { date: today(), tasks: garden.tasks, bflies: garden.bflies, cat: !!garden.cat }); }
+function loadTasks() {
+  const d = readDay(), past = performance.now() - 60000;
+  garden.tasks = d.tasks; garden.bflies = d.bflies;
   garden.butterflies = []; garden.seedlings = [];
-  const past = performance.now() - 60000;
-  for (let i = 0; i < Math.min(garden.tasks, 24); i++) addButterfly(i, past - i * 777);
-  for (let i = 0; i < Math.floor(garden.tasks / 3); i++) garden.seedlings.push({ t0: past });
+  for (let i = 0; i < Math.min(garden.bflies, 24); i++) addButterfly(i, past - i * 777);
+  const seeds = Math.max(sceneStore.get('seeds', 0) | 0, Math.floor(d.tasks / 3));
+  for (let i = 0; i < seeds; i++) garden.seedlings.push({ t0: past });
+  garden.cat = d.cat ? { t0: past } : null;
+  refreshButtons();
+}
+function refreshButtons() {
   $('tasks').textContent = garden.tasks;
+  $('shoo').disabled = !garden.butterflies.some(b => !b.leave);
 }
 function toast(text) { const el = $('toast'); el.textContent = text; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); }
+
 $('done').onclick = () => {
   if (!garden.g) return;
-  if (sceneStore.get('day', {}).date !== today()) loadTasks();      // наступил новый день
-  garden.tasks++;
-  sceneStore.set('day', { date: today(), tasks: garden.tasks });
+  if ((sceneStore.get('day', {}) || {}).date !== today()) loadTasks();      // наступил новый день
   const now = performance.now();
-  if (garden.butterflies.length < 24) addButterfly(garden.tasks - 1, now);
-  let msg = '🦋 Прилетела бабочка · задача №' + garden.tasks;
-  if (garden.tasks % 3 === 0) { garden.seedlings.push({ t0: now }); msg = '🌱 На полке новый росток · задача №' + garden.tasks; }
-  toast(msg);
-  $('tasks').textContent = garden.tasks;
+  garden.tasks++; garden.bflies++;
+  if (garden.butterflies.filter(b => !b.leave).length < 24) addButterfly(garden.bflies - 1, now);
+  const msgs = ['🦋 Прилетела бабочка'];
+  if (garden.tasks % 3 === 0) {                                     // каждая третья задача — росток в коллекцию
+    garden.seedlings.push({ t0: now }); sceneStore.set('seeds', garden.seedlings.length);
+    msgs[0] = '🌱 На полке новый росток';
+  }
+  if (garden.tasks === 3 && !garden.cat) { garden.cat = { t0: now }; msgs.unshift('🐱 В сад пришёл кот'); }
+  saveDay();
+  toast(msgs.join(' · ') + ' · задача №' + garden.tasks);
+  refreshButtons();
   const b = $('done'); b.classList.remove('glow'); void b.offsetWidth; b.classList.add('glow');
 };
-// Сброс: первое нажатие спрашивает, второе в течение 3 секунд — сбрасывает
+
+// «Убрать бабочек»: они улетают в окно, всё остальное остаётся
+$('shoo').onclick = () => {
+  const now = performance.now(), flying = garden.butterflies.filter(b => !b.leave);
+  if (!flying.length) return;
+  for (const b of flying) b.leave = now;
+  garden.bflies = 0; saveDay(); refreshButtons();
+  toast('🦋 Бабочки улетели в окно');
+};
+
+// «Сбросить задачи»: первое нажатие спрашивает, второе в течение 3 секунд — сбрасывает.
+// Обнуляет счётчик и награды дня (кот уходит и снова станет наградой за третью задачу).
+// Ростки на полках и бабочки остаются, таймер не трогаем.
 let askUntil = 0;
+const resetLabel = '↺ <span class="long">Сбросить задачи</span><span class="short">Сброс</span>';
 $('reset').onclick = () => {
   const btn = $('reset'), now = performance.now();
   if (now > askUntil) {
-    askUntil = now + 3000; btn.textContent = 'Точно сбросить?'; btn.classList.add('ask');
-    setTimeout(() => { if (performance.now() >= askUntil) { btn.textContent = '↺'; btn.classList.remove('ask'); } }, 3050);
+    askUntil = now + 3000; btn.textContent = 'Точно? Нажмите ещё раз'; btn.classList.add('ask');
+    setTimeout(() => { if (performance.now() >= askUntil) { btn.innerHTML = resetLabel; btn.classList.remove('ask'); } }, 3050);
     return;
   }
-  askUntil = 0; btn.textContent = '↺'; btn.classList.remove('ask');
-  for (const b of garden.butterflies) b.leave = now;                  // бабочки улетают в окно
-  garden.seedlings = [];
+  askUntil = 0; btn.innerHTML = resetLabel; btn.classList.remove('ask');
   garden.tasks = 0;
-  sceneStore.set('day', { date: today(), tasks: 0 });
-  $('tasks').textContent = 0;
+  if (garden.cat && !garden.cat.leave) garden.cat.leave = now;       // кот уходит
+  saveDay(); refreshButtons();
   toast('↺ Задачи за сегодня сброшены');
 };
 loadTasks();
@@ -672,11 +808,13 @@ function frame(now) {
   drawPetal(g, p, now);
   drawLadybug(g, now);
   drawTable(g, L.lamps, now);
+  drawCat(g, now);
   drawBigPlant(g, now);
   drawButterflies(g, now);
   // свет: тёплый или вечерний оттенок на всю сцену
   ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = rgb(L.tint); ctx.fillRect(0, 0, g.W, g.H); ctx.restore();
   drawRays(g, L, p, now);
+  drawSpots(g, p, now);
   drawGlow(g, L.lamps, now);
   drawFireflies(g, L.lamps, now);
   // мягкая виньетка
