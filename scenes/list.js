@@ -10,4 +10,6 @@ window.SCENE_LIST = [
   'salary',
   'greenhouse',
   'metro',
+  'mosaic',
+  'snake',
 ];
