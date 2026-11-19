@@ -1,6 +1,7 @@
 // Мозаика: 10 000 кубиков — это раскраска. Незакрашенные кубики — светлая «бумага» с лёгким намёком на рисунок,
 // а с ходом рабочего дня они закрашиваются яркими цветами и проявляют закат над горами и озером.
-// Цвет растекается органичными пятнами от центра, свежие кубики вспыхивают, по фронту ходит «кисть».
+// Закрашивание идёт ровной диагональной волной из нижнего левого угла в верхний правый,
+// свежие кубики вспыхивают, по фронту ходит «кисть».
 
 const TOTAL = 10000;
 const cv = makeCanvas();
@@ -62,11 +63,11 @@ function set(k, force) {
   if (force || !mz.g) {
     const W = area.clientWidth, H = area.clientHeight; if (!W || !H) return;
     const port = H > W * 1.05, cols = port ? 80 : 125, rows = TOTAL / cols;
-    // порядок: пятна по шуму плюс расстояние от центра — краска растекается органично
-    const pr = rng(9), keys = new Float32Array(TOTAL), order = new Uint32Array(TOTAL);
+    // порядок: диагональная волна от нижнего левого угла к верхнему правому, внутри диагонали — снизу вверх
+    const keys = new Float32Array(TOTAL), order = new Uint32Array(TOTAL);
     for (let i = 0; i < TOTAL; i++) {
       const x = i % cols / cols, y = Math.floor(i / cols) / rows;
-      keys[i] = noise(x * 4, y * 4, 11) * 0.35 + Math.hypot(x - 0.5, (y - 0.5) * rows / cols) * 1.4 + pr() * 0.06;
+      keys[i] = x + (1 - y) + (1 - y) * 1e-4;
       order[i] = i;
     }
     order.sort((a, b) => keys[a] - keys[b]);
