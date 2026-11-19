@@ -1,8 +1,11 @@
-// Змейка: ползает по полю, а каждые 0,5% рабочего дня появляется яблоко.
-// Она находит его кратчайшим путём (стараясь не запереть себя), съедает и растёт.
-// За день — 200 яблок. Длина змейки показывает, сколько дня уже прошло.
+// Змейка: ползает по полю, а каждые 0,5% рабочего дня появляется яблоко. Съела — выросла на клетку.
+// Поле ровно такого размера, какой змейка станет к концу дня: когда остаётся последнее яблоко,
+// свободна ровно одна клетка, а в 100% змейка занимает всё поле.
+// Чтобы так получилось без тупиков, змейка ходит по замкнутому маршруту через все клетки поля
+// и срезает путь к яблоку, только когда это безопасно.
 
-const APPLES = 200, START = 3;
+const APPLES = 200;
+let START = 10;                                   // стартовая длина: клеток на поле − 200 яблок
 const cv = makeCanvas();
 css(`
   .hud { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); pointer-events: none; white-space: nowrap;
@@ -11,19 +14,41 @@ css(`
   .hud b { font-variant-numeric: tabular-nums; }
   .hud span { color: #8a90a0; font-weight: 500; }
 `);
-html('<div class="hud">🍎 <b id="eaten">0</b><span> из 200</span> · 🐍 длина <b id="len">3</b></div>');
+html('<div class="hud">🍎 <b id="eaten">0</b><span> из 200</span> · 🐍 <b id="len">0</b><span> из <b id="cells">0</b> клеток</span></div>');
 
 const sn = { g: null, body: [], oldTail: null, dir: [1, 0], grow: 0, apples: [], spawned: 0, eaten: 0, acc: 0, last: 0, bursts: [] };
 const spawnedAt = p => Math.max(0, Math.min(APPLES, Math.floor(p * 2 + 1e-9)));     // каждые 0,5%
+const key = (x, y) => y * 1000 + x;
+
+// поле cols×rows: клеток чуть больше 200, хотя бы одна сторона чётная (нужно для замкнутого обхода), форма — под экран
+function pickBoard(aw, ah) {
+  let best = null;
+  for (let cols = 6; cols <= 40; cols++) for (let rows = 6; rows <= 40; rows++) {
+    const n = cols * rows; if (n < 206 || n > 224 || (cols % 2 && rows % 2)) continue;
+    const score = Math.abs(Math.log(cols / rows / (aw / ah))) + (n - 206) * 0.004;
+    if (!best || score < best.score) best = { cols, rows, score };
+  }
+  return best;
+}
+// замкнутый маршрут через все клетки: ряды «змейкой» по столбцам 1..cols-1, обратно — по столбцу 0
+function buildCycle(cols, rows) {
+  const T = rows % 2 !== 0;                                            // нужно чётное число рядов — иначе строим транспонированно
+  const C = T ? rows : cols, R = T ? cols : rows, path = [];
+  for (let y = 0; y < R; y++) for (let i = 1; i < C; i++) path.push([y % 2 ? C - i : i, y]);
+  for (let y = R - 1; y >= 0; y--) path.push([0, y]);
+  return T ? path.map(([x, y]) => [y, x]) : path;
+}
 
 function set(k, force) {
   if (force || !sn.g) {
     const W = area.clientWidth, H = area.clientHeight; if (!W || !H) return;
     const top = 44, pad = 10, aw = W - pad * 2, ah = H - top - pad;
-    let cols = Math.max(12, Math.round(Math.sqrt(820 * aw / ah))), rows = Math.max(10, Math.round(820 / cols));
-    const c = Math.floor(Math.min(aw / cols, ah / rows));
-    sn.g = { W, H, cols, rows, c, ox: Math.round((W - cols * c) / 2), oy: Math.round(top + (ah - rows * c) / 2) };
+    const { cols, rows } = pickBoard(aw, ah), c = Math.floor(Math.min(aw / cols, ah / rows));
+    const cycle = buildCycle(cols, rows), idx = new Map(cycle.map((p, i) => [key(...p), i]));
+    START = cols * rows - APPLES;
+    sn.g = { W, H, cols, rows, c, N: cols * rows, cycle, idx, ox: Math.round((W - cols * c) / 2), oy: Math.round(top + (ah - rows * c) / 2) };
     fitCanvas(cv);
+    $('cells').textContent = sn.g.N;
     reset();
   }
   const now = spawnedAt(curPct);
@@ -32,96 +57,48 @@ function set(k, force) {
   while (sn.spawned < spawnedAt(curPct)) { addApple(); sn.spawned++; }
 }
 
-// змейка нужной длины, уложенная «змейкой» снизу поля; все яблоко кроме последнего уже съедены
+// змейка нужной длины лежит на маршруте; все яблоки, кроме последнего, уже съедены
 function reset() {
-  const g = sn.g, spawned = spawnedAt(curPct), eaten = Math.max(0, spawned - 1), len = Math.min(START + eaten, g.cols * g.rows - 10);
-  const cells = [];
-  for (let y = g.rows - 1; y >= 0 && cells.length < len; y--)
-    for (let i = 0; i < g.cols && cells.length < len; i++) cells.push([(g.rows - 1 - y) % 2 ? g.cols - 1 - i : i, y]);
-  sn.body = cells.reverse(); sn.oldTail = sn.body[sn.body.length - 1].slice();
-  const [hx, hy] = sn.body[0], [nx, ny] = sn.body[1] || [hx - 1, hy];
-  sn.dir = [Math.sign(hx - nx) || 1, Math.sign(hy - ny)];
+  const g = sn.g, spawned = spawnedAt(curPct), eaten = Math.max(0, spawned - 1), len = START + eaten;
+  sn.body = []; for (let i = len - 1; i >= 0; i--) sn.body.push(g.cycle[i].slice());
+  sn.oldTail = sn.body[sn.body.length - 1].slice();
+  const [hx, hy] = sn.body[0], [nx, ny] = sn.body[1];
+  sn.dir = [hx - nx, hy - ny];
   sn.grow = 0; sn.apples = []; sn.eaten = eaten; sn.spawned = eaten;
 }
 
-const key = (x, y) => y * 1000 + x;
-function occupied(skipTail) {
-  const s = new Set(); const n = sn.body.length - (skipTail ? 1 : 0);
-  for (let i = 0; i < n; i++) s.add(key(...sn.body[i]));
-  return s;
-}
+function occupied() { const s = new Set(); for (const p of sn.body) s.add(key(...p)); return s; }
 function addApple() {
-  const g = sn.g, occ = occupied(false); for (const a of sn.apples) occ.add(key(a.x, a.y));
-  const r = rng(sn.spawned * 7919 + 17);
-  for (let tries = 0; tries < 2000; tries++) {
-    const x = Math.floor(r() * g.cols), y = Math.floor(r() * g.rows);
-    if (!occ.has(key(x, y))) { sn.apples.push({ x, y, t0: performance.now() }); return; }
-  }
+  const g = sn.g, occ = occupied(); for (const a of sn.apples) occ.add(key(a.x, a.y));
+  const free = []; for (let y = 0; y < g.rows; y++) for (let x = 0; x < g.cols; x++) if (!occ.has(key(x, y))) free.push([x, y]);
+  if (!free.length) return;
+  const [x, y] = free[Math.floor(rng(sn.spawned * 7919 + 17)() * free.length)];
+  sn.apples.push({ x, y, t0: performance.now() });
 }
 const inside = (x, y) => x >= 0 && y >= 0 && x < sn.g.cols && y < sn.g.rows;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-// сколько клеток доступно с (x, y) — чтобы не заползти в тупик
-function room(x, y, walls, limit) {
-  const seen = new Set([key(x, y)]), q = [[x, y]];
-  while (q.length && seen.size < limit) {
-    const [cx, cy] = q.pop();
-    for (const [dx, dy] of DIRS) { const nx = cx + dx, ny = cy + dy, k = key(nx, ny); if (inside(nx, ny) && !walls.has(k) && !seen.has(k)) { seen.add(k); q.push([nx, ny]); } }
-  }
-  return seen.size;
-}
-// кратчайший путь от start до любой клетки из goals (walls — занятые клетки); возвращает клетки пути без start
-function bfs(start, goals, walls) {
-  const s0 = key(...start), from = new Map([[s0, -1]]), q = [start];
-  for (let qi = 0; qi < q.length; qi++) {
-    const [cx, cy] = q[qi], ck = key(cx, cy);
-    if (qi > 0 && goals.has(ck)) { const path = []; for (let k = ck; k !== s0; k = from.get(k)) path.unshift([k % 1000, Math.floor(k / 1000)]); return path; }
+function step() {
+  const g = sn.g, N = g.N, head = sn.body[0], tail = sn.body[sn.body.length - 1];
+  const at = p => g.idx.get(key(...p)), d = (a, b) => (b - a + N) % N, h = at(head), toTail = d(h, at(tail));
+  const occ = occupied(), apples = sn.apples.map(a => d(h, at([a.x, a.y]))), target = apples.length ? Math.min(...apples) : 0;
+  // по умолчанию — следующая клетка маршрута (всегда безопасно)
+  let best = g.cycle[(h + 1) % N], bestD = 1;
+  // срезаем вперёд по маршруту, пока змейка короче половины поля и не обгоняем свой хвост и яблоко
+  if (target > 1 && sn.body.length < N * 0.6) {
     for (const [dx, dy] of DIRS) {
-      const nx = cx + dx, ny = cy + dy, k = key(nx, ny);
-      if (inside(nx, ny) && !from.has(k) && (!walls.has(k) || goals.has(k))) { from.set(k, ck); q.push([nx, ny]); }
+      const x = head[0] + dx, y = head[1] + dy; if (!inside(x, y) || occ.has(key(x, y))) continue;
+      const dd = d(h, at([x, y])), slack = toTail - dd;
+      if (dd > bestD && dd <= target && slack > 4) { best = [x, y]; bestD = dd; }
     }
   }
-  return null;
-}
-// сможет ли змейка с таким телом добраться до своего хвоста (значит, не заперта)
-function tailReachable(body) {
-  if (body.length < 4) return true;
-  const walls = new Set(); for (let i = 1; i < body.length - 1; i++) walls.add(key(...body[i]));
-  return !!bfs(body[0], new Set([key(...body[body.length - 1])]), walls);
-}
-// тело после того, как змейка проползёт по пути (с учётом роста)
-function follow(path, grow, appleKeys) {
-  const body = sn.body.map(p => p.slice());
-  for (const c of path) { body.unshift(c); if (appleKeys.has(key(...c))) grow++; if (grow > 0) grow--; else body.pop(); }
-  return body;
-}
-
-function step() {
-  const head = sn.body[0], walls = occupied(sn.grow === 0), appleKeys = new Set(sn.apples.map(a => key(a.x, a.y)));
-  let next = null;
-  // 1) к яблоку — только если после еды не окажется взаперти
-  if (appleKeys.size) {
-    const path = bfs(head, appleKeys, walls);
-    if (path && tailReachable(follow(path, sn.grow, appleKeys))) next = path[0];
-  }
-  // 2) иначе — безопасный ход, после которого хвост достижим; держимся от хвоста подальше, чаще ползём прямо
-  if (!next) {
-    const moves = DIRS.map(([dx, dy]) => [head[0] + dx, head[1] + dy]).filter(([x, y]) => inside(x, y) && !walls.has(key(x, y)));
-    if (!moves.length) { reset(); return; }                            // совсем некуда — начинает заново, длина та же
-    const scored = moves.map(m => {
-      const body = follow([m], sn.grow, appleKeys), ok = tailReachable(body);
-      const tailPath = ok && body.length >= 4 ? bfs(m, new Set([key(...body[body.length - 1])]), new Set(body.slice(1, -1).map(p => key(...p)))) : null;
-      const straight = m[0] - head[0] === sn.dir[0] && m[1] - head[1] === sn.dir[1];
-      return { m, ok, score: (ok ? 1000 : room(m[0], m[1], walls, 900)) + (tailPath ? tailPath.length : 0) + (straight ? 6 : 0) + Math.random() * (appleKeys.size ? 0.5 : 2) };
-    });
-    next = scored.sort((a, b) => (b.ok - a.ok) || (b.score - a.score))[0].m;
-  }
-  const pick = [next[0], next[1], next[0] - head[0], next[1] - head[1]];
-  sn.body.unshift([pick[0], pick[1]]); sn.dir = [pick[2], pick[3]];
-  // хвост: откуда он сейчас подтягивается (если змейка растёт — стоит на месте)
-  if (sn.grow > 0) { sn.grow--; sn.oldTail = sn.body[sn.body.length - 1].slice(); } else sn.oldTail = sn.body.pop();
-  const ai = sn.apples.findIndex(a => a.x === pick[0] && a.y === pick[1]);
-  if (ai >= 0) { sn.apples.splice(ai, 1); sn.grow++; sn.eaten++; sn.bursts.push({ x: pick[0], y: pick[1], t0: performance.now() }); }
+  sn.body.unshift(best.slice()); sn.dir = [best[0] - head[0], best[1] - head[1]];
+  // съела яблоко — растёт сразу (хвост остаётся на месте), иначе хвост подтягивается
+  const ai = sn.apples.findIndex(a => a.x === best[0] && a.y === best[1]);
+  if (ai >= 0) {
+    sn.apples.splice(ai, 1); sn.eaten++; sn.bursts.push({ x: best[0], y: best[1], t0: performance.now() });
+    sn.oldTail = sn.body[sn.body.length - 1].slice();
+  } else sn.oldTail = sn.body.pop();
 }
 
 function frame(now) {
