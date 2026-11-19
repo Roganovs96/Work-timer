@@ -28,6 +28,7 @@
     <button class="arrow" id="prev" aria-label="Предыдущая">‹</button>
     <div class="dots" id="dots"></div>
     <span id="sceneName"></span>
+    <button class="menu-btn" id="menuBtn" aria-label="Все сцены">☰</button>
     <button class="arrow" id="next" aria-label="Следующая">›</button>
   </div>
 
@@ -37,6 +38,13 @@
       Конец <input type="time" id="end" value="19:00">
     </div>
     <button class="btn primary" id="leave" style="margin-left: auto">Уйти пораньше 🏃</button>
+  </div>
+</div>
+
+<div class="menu" id="menu" hidden>
+  <div class="menu-sheet" role="dialog" aria-label="Все сцены">
+    <div class="menu-head"><span>Все сцены</span><button class="menu-close" id="menuClose" aria-label="Закрыть">✕</button></div>
+    <div class="menu-list" id="menuList"></div>
   </div>
 </div>
 

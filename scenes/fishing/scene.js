@@ -178,7 +178,7 @@ function pondFrame(now) {
 
 
 registerScene({
-  name: 'Рыбалка', author: 'Roganovs96',
+  name: 'Рыбалка', icon: '🎣', author: 'Roganovs96',
   words: ['поклёвка', 'каждые', 'следующая поклёвка', 'следующая'],
   set: pondSet, frame: pondFrame,
   onFast(f) { if (!f) pond.jumps = []; },

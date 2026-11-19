@@ -31,7 +31,8 @@ const smooth = p => p * p * (3 - 2 * p);
 function makeCanvas() {
   const c = document.createElement('canvas');
   c.className = 'scene-canvas';
-  document.body.appendChild(c);
+  document.body.prepend(c);          // холст всегда под кнопками и подписями сцены, иначе он перехватит нажатия
+
   return c;
 }
 // Свой HTML поверх холста (подписи, кнопки) и стили для него
@@ -111,7 +112,7 @@ let SCENE = null, visible = false, ticked = false, lastSub = '', sized = false, 
 function registerScene(def) {
   if (SCENE) throw new Error('registerScene вызван дважды');
   SCENE = def;
-  send({ type: 'ready', name: def.name, author: def.author, words: def.words, steps: def.steps, interactive: def.interactive === true });
+  send({ type: 'ready', name: def.name, icon: def.icon, author: def.author, words: def.words, steps: def.steps, interactive: def.interactive === true });
   if (def.interactive) watchSwipes();
 }
 

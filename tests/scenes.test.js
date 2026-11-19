@@ -68,6 +68,15 @@ for (const folder of folders) {
           assert.ok(p.painted >= 10 || p.text > 0, `${pct}%: сцена ничего не нарисовала`);
           if (pct === 37.3) await page.screenshot({ path: path.join(OUT, `${folder}-${vpName}.png`) });
         }
+        // кнопки, поля и списки сцены не перекрыты (например, холстом) — на них можно нажать
+        const covered = await page.frames().find(f => f.url().includes('scene=' + folder)).evaluate(() =>
+          [...document.querySelectorAll('button, input, select, textarea, a[href]')].filter(el => {
+            const r = el.getBoundingClientRect(); if (!r.width || !r.height || getComputedStyle(el).visibility === 'hidden') return false;
+            const x = Math.min(innerWidth - 1, r.x + r.width / 2), y = Math.min(innerHeight - 1, r.y + r.height / 2); if (x < 0 || y < 0) return false;
+            const top = document.elementFromPoint(x, y); return top && top !== el && !el.contains(top);
+          }).map(el => (el.id ? '#' + el.id : el.tagName.toLowerCase()) + ' под ' + document.elementFromPoint(
+            Math.min(innerWidth - 1, el.getBoundingClientRect().x + el.getBoundingClientRect().width / 2), Math.min(innerHeight - 1, el.getBoundingClientRect().y + el.getBoundingClientRect().height / 2)).tagName.toLowerCase()));
+        assert.deepStrictEqual(covered, [], 'элементы управления перекрыты и не нажимаются');
         // плавная работа во времени
         await page.evaluate(() => __wt.setPct(null));
         await page.waitForTimeout(1500);

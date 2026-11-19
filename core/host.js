@@ -44,7 +44,7 @@ class SceneFrame {
         const words = Array.isArray(m.words) && m.words.length === 4 && m.words.every(w => str(w, 30)) ? m.words : null;
         if (m.words && !words) this.error('words: нужен массив из 4 строк до 30 символов');
         const steps = Number.isInteger(m.steps) && m.steps >= 1 && m.steps <= 10000 ? m.steps : 300;
-        this.meta = { name: m.name.trim(), author: str(m.author, 40) ? m.author : '', words, steps, interactive: m.interactive === true };
+        this.meta = { name: m.name.trim(), icon: str(m.icon, 8) ? m.icon.trim() : '', author: str(m.author, 40) ? m.author : '', words, steps, interactive: m.interactive === true };
         // интерактивной сцене (поля ввода, кнопки) нужны настоящие нажатия: убираем слой для свайпов,
         // листать ленту она будет сама, присылая { type: 'swipe' }
         this.touch.style.display = this.meta.interactive ? 'none' : '';

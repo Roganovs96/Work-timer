@@ -211,7 +211,7 @@ function drawGrave(g, season, sp, now) {
 }
 
 registerScene({
-  name: 'Батрак', author: 'Roganovs96',
+  name: 'Батрак', icon: '👨‍🌾', author: 'Roganovs96',
   words: ['год', 'каждые', 'следующий год', 'следующий'], steps: 100,
   set: lifeSet, frame: lifeFrame, tick: updateBio,
 });

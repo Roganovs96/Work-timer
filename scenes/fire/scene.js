@@ -186,7 +186,7 @@ function fireFrame(now) {
 
 
 registerScene({
-  name: 'Костёр', author: 'Roganovs96',
+  name: 'Костёр', icon: '🔥', author: 'Roganovs96',
   words: ['полено', 'каждые', 'следующее полено', 'следующее'],
   set: fireSet, frame: fireFrame,
   onFast(f) { if (!f) fire.tosses = []; },

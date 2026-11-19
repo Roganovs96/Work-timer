@@ -835,4 +835,4 @@ function sub() {
   return [{ t: 'Следующее растение через ' }, { ms: ((b + 1) / g.n * 100 - curPct) / 100 * dayLenMs(), b: true }];
 }
 
-registerScene({ name: 'Зимний сад', author: 'Roganovs96', set, frame, tick, sub });
+registerScene({ name: 'Зимний сад', icon: '🌷', author: 'Roganovs96', set, frame, tick, sub });

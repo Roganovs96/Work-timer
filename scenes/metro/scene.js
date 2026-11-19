@@ -107,7 +107,6 @@ css(`
     backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
   .ctl .tag { flex: 1 1 100%; font-size: 12.5px; color: #c9ced8; font-weight: 600; letter-spacing: .01em; }
   .ctl label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8a90a0; flex: 1 1 210px; min-width: 0; }
-  .ctl select { flex: 1; min-width: 0; background: #262a34; color: #e8eaf0; border: 1px solid #2f3440; border-radius: 9px; padding: 6px 8px; font-size: 13px; }
   .ctl .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
   .ctl button { background: #262a34; color: #e8eaf0; border: 1px solid #2f3440; border-radius: 9px; padding: 6px 9px; font-size: 13px; cursor: pointer; }
   .err { position: absolute; left: 50%; transform: translateX(-50%); padding: 7px 12px; border-radius: 10px; font-size: 13px; color: #ffd6d6;
@@ -124,29 +123,48 @@ css(`
 `);
 html(`<div class="ctl" id="ctl">
   <div class="tag">🏠 Визуализируй дорогу до дома — и узнай, насколько ты близко</div>
-  <label><span class="dot" id="dotA"></span>Откуда <select id="from"></select></label>
-  <button id="swap" title="Поменять местами">⇅</button>
-  <label><span class="dot" id="dotB"></span>Куда <select id="to"></select></label>
+  <button class="pick" id="from"><span class="dot" id="dotA"></span><span class="lbl">Откуда</span><span class="st" id="fromName"></span><span class="chev">▾</span></button>
+  <button class="swap" id="swap" title="Поменять местами">⇅</button>
+  <button class="pick" id="to"><span class="dot" id="dotB"></span><span class="lbl">Куда</span><span class="st" id="toName"></span><span class="chev">▾</span></button>
 </div>
 <div class="err" id="err"></div>
-<div class="info" id="info"><div class="now" id="now"></div><div class="next" id="next"></div><div class="meta" id="meta"></div><div class="bar"><i id="bar"></i></div></div>`);
+<div class="info" id="info"><div class="now" id="now"></div><div class="next" id="next"></div><div class="meta" id="meta"></div><div class="bar"><i id="bar"></i></div></div>
+<div class="sheet" id="sheet" hidden>
+  <div class="sh-head"><span id="shTitle">Откуда</span><button class="sh-close" id="shClose" aria-label="Закрыть">✕</button></div>
+  <input class="sh-search" id="shSearch" type="search" placeholder="Поиск станции" autocomplete="off">
+  <div class="sh-list" id="shList"></div>
+</div>`);
+css(`
+  .pick { flex: 1 1 200px; min-width: 0; display: flex; align-items: center; gap: 7px; text-align: left; padding: 7px 10px !important; }
+  .pick .lbl { font-size: 11px; color: #8a90a0; flex: none; }
+  .pick .st { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 14px; }
+  .pick .chev { color: #8a90a0; font-size: 11px; }
+  .sheet { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; background: #0f1116; }
+  .sheet[hidden] { display: none; }
+  .sh-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 6px; font-size: 12px; font-weight: 600;
+    letter-spacing: .12em; text-transform: uppercase; color: #8a90a0; }
+  .sh-close { background: none; border: none; color: #c9ced8; font-size: 20px; padding: 4px 8px; cursor: pointer; }
+  .sh-search { margin: 0 12px 8px; padding: 10px 12px; border-radius: 12px; border: 1px solid #2f3440; background: #1e222b; color: #e8eaf0; font-size: 16px; }
+  .sh-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 8px 12px; }
+  .sh-line { position: sticky; top: 0; display: flex; align-items: center; gap: 8px; padding: 8px 6px 6px; font-size: 12px; font-weight: 700;
+    color: #c9ced8; background: #0f1116; }
+  .sh-st { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 10px; border: none; border-radius: 10px; background: none;
+    color: #e8eaf0; font-size: 15px; text-align: left; cursor: pointer; }
+  .sh-st:hover, .sh-st:active { background: #232833; }
+  .sh-st.on { background: rgba(79, 156, 255, 0.16); }
+  .sh-st .ln { width: 4px; align-self: stretch; border-radius: 2px; }
+  .sh-st small { color: #8a90a0; font-size: 12px; margin-left: auto; }
+  .sh-empty { color: #8a90a0; text-align: center; padding: 24px; font-size: 14px; }
+`);
 
-// выпадающие списки по линиям, внутри — по алфавиту
-for (const sel of [$('from'), $('to')]) {
-  for (const [num, name] of LINES) {
-    const og = document.createElement('optgroup'); og.label = num + '. ' + name;
-    [...LINE[num].ids].sort((a, b) => ST[a].name.localeCompare(ST[b].name, 'ru')).forEach(id => og.appendChild(new Option(ST[id].name, id)));
-    sel.appendChild(og);
-  }
-}
 const metro = { g: null, plan: null, err: '' };
 const pick = (key, def) => { const v = sceneStore.get(key, def); return ST[v] ? v : def; };
-$('from').value = pick('from', '6:Медведково');
-$('to').value = pick('to', '1:Юго-Западная');
+const sel = { from: pick('from', '6:Медведково'), to: pick('to', '1:Юго-Западная') };
 
 function choose(save) {
-  const a = $('from').value, b = $('to').value;
+  const a = sel.from, b = sel.to;
   $('dotA').style.background = LINE[ST[a].line].color; $('dotB').style.background = LINE[ST[b].line].color;
+  $('fromName').textContent = ST[a].name; $('toName').textContent = ST[b].name;
   if (save) { sceneStore.set('from', a); sceneStore.set('to', b); }
   let err = '', pl = null;
   if (sameStop(a, b)) err = 'Выберите разные станции';
@@ -166,9 +184,48 @@ function choose(save) {
   if (metro.g) layout();
   tick();
 }
-$('from').onchange = () => choose(true);
-$('to').onchange = () => choose(true);
-$('swap').onclick = () => { const a = $('from').value; $('from').value = $('to').value; $('to').value = a; choose(true); };
+
+// ===== Выбор станции: свой список с поиском (надёжнее встроенного <select> на телефонах) =====
+let picking = null;
+const norm = t => t.toLowerCase().replace(/ё/g, 'е');
+function openPicker(which) {
+  picking = which;
+  $('shTitle').textContent = which === 'from' ? 'Откуда едем' : 'Куда едем';
+  $('shSearch').value = '';
+  renderPicker();
+  $('sheet').hidden = false;
+}
+function renderPicker() {
+  const q = norm($('shSearch').value.trim()), out = [];
+  for (const [num, name, color] of LINES) {
+    const ids = LINE[num].ids.filter(id => !q || norm(ST[id].name).includes(q));
+    if (!ids.length) continue;
+    const head = document.createElement('div'); head.className = 'sh-line';
+    head.innerHTML = `<span class="badge" style="background:${color};display:inline-grid;place-items:center;min-width:20px;height:20px;border-radius:10px;color:#fff;font-size:11px">${num}</span>`;
+    head.append(name);
+    out.push(head);
+    for (const id of ids) {
+      const b = document.createElement('button'); b.className = 'sh-st' + (id === sel[picking] ? ' on' : ''); b.dataset.id = id;
+      const ln = document.createElement('span'); ln.className = 'ln'; ln.style.background = color;
+      const nm = document.createElement('span'); nm.textContent = ST[id].name;
+      b.append(ln, nm);
+      if (GROUP[id] != null) { const sm = document.createElement('small'); sm.textContent = 'пересадка'; b.append(sm); }
+      out.push(b);
+    }
+  }
+  if (!out.length) { const e = document.createElement('div'); e.className = 'sh-empty'; e.textContent = 'Такой станции нет на схеме (линии 1–10)'; out.push(e); }
+  $('shList').replaceChildren(...out);
+  $('shList').scrollTop = 0;
+}
+$('from').onclick = () => openPicker('from');
+$('to').onclick = () => openPicker('to');
+$('shClose').onclick = () => { $('sheet').hidden = true; };
+$('shSearch').oninput = renderPicker;
+$('shList').onclick = e => {
+  const b = e.target.closest('.sh-st'); if (!b || !picking) return;
+  sel[picking] = b.dataset.id; $('sheet').hidden = true; choose(true);
+};
+$('swap').onclick = () => { [sel.from, sel.to] = [sel.to, sel.from]; choose(true); };
 
 // ===== Где мы сейчас =====
 // доля дня → позиция на маршруте
@@ -193,7 +250,7 @@ function tick() {
   const stopsDone = pl.stops.findIndex(id => sameStop(id, w.q > 0.5 ? w.s.b : w.s.a));
   let now, next;
   if (w.done) { now = `${badge(B.line)} Приехали: ${B.name}`; next = 'Рабочий день окончен 🎉'; }
-  else if (w.s.kind === 'walk') { now = `🚶 Пересадка: ${badge(A.line)} ${A.name} → ${badge(B.line)} ${B.name}`; next = `Поезд по ${LINE[B.line].name.toLowerCase()} линии через <b>${fmtMin(msToNext(w))}</b>`; }
+  else if (w.s.kind === 'walk') { now = `🚶 Пересадка: ${badge(A.line)} ${A.name} → ${badge(B.line)} ${B.name}`; next = `Дальше по линии «${LINE[B.line].name}» — через <b>${fmtMin(msToNext(w))}</b>`; }
   else if (w.q < 0.12 && w.i > 0 && pl.segs[w.i - 1].kind === 'ride' || w.q < 0.12 && w.i === 0) { now = `${badge(A.line)} Станция ${A.name}`; next = `Следующая — ${B.name}, через <b>${fmtMin(msToNext(w))}</b>`; }
   else { now = `${badge(A.line)} Перегон ${A.name} → ${B.name}`; next = `Следующая — ${B.name}, через <b>${fmtMin(msToNext(w))}</b>`; }
   const after = pl.segs[w.i + 1];
@@ -293,5 +350,5 @@ function sub() {
   return [{ t: ST[nextStop(w)].name.slice(0, 40) + ' через ' }, { ms: msToNext(w), b: true }];
 }
 
-registerScene({ name: 'Метро', author: 'Roganovs96', interactive: true, set, frame, tick, sub });
+registerScene({ name: 'Метро', icon: '🚇', author: 'Roganovs96', interactive: true, set, frame, tick, sub });
 choose(false);

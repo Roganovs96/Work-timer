@@ -206,6 +206,6 @@ function trainSub() {
 }
 
 registerScene({
-  name: 'Карта', author: 'Roganovs96',
+  name: 'Карта', icon: '🗺️', author: 'Roganovs96',
   set: mapSet, frame: mapFrame, tick: updateMapInfo, sub: trainSub,
 });

@@ -35,6 +35,23 @@ const scenes = (window.SCENE_LIST || []).map(f => new SceneFrame(f, area));
 let active = Math.max(0, scenes.findIndex(s => s.folder === state.scene));
 if (typeof state.scene === 'number') active = Math.min(scenes.length - 1, state.scene);   // старый формат: номер
 
+// Меню со всеми сценами: быстрый переход без перелистывания
+function openMenu() {
+  $('menuList').replaceChildren(...scenes.map((s, i) => {
+    const b = document.createElement('button'); b.className = 'menu-item' + (i === active ? ' on' : ''); b.dataset.i = i;
+    const ic = document.createElement('span'); ic.className = 'mi-ic'; ic.textContent = (s.meta && s.meta.icon) || '•';
+    const nm = document.createElement('span'); nm.textContent = s.name;
+    b.append(ic, nm); return b;
+  }));
+  $('menu').hidden = false;
+}
+const closeMenu = () => { $('menu').hidden = true; };
+$('menuBtn').onclick = openMenu;
+$('menuClose').onclick = closeMenu;
+$('menu').onclick = e => { if (e.target === $('menu')) closeMenu(); };
+$('menuList').onclick = e => { const b = e.target.closest('.menu-item'); if (b) { closeMenu(); goTo(+b.dataset.i, false); } };
+addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+
 function drawNav() {
   $('dots').replaceChildren(...scenes.map((s, i) => {
     const b = document.createElement('button'); b.setAttribute('aria-label', s.name); b.dataset.i = i;
@@ -73,7 +90,7 @@ $('prev').onclick = () => goTo(active - 1, true);
 $('next').onclick = () => goTo(active + 1, true);
 $('dots').onclick = e => { if (e.target.dataset.i) goTo(+e.target.dataset.i, true); };
 addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return;
+  if (e.target.tagName === 'INPUT' || !$('menu').hidden) return;
   if (e.key === 'ArrowLeft') goTo(active - 1, true);
   if (e.key === 'ArrowRight') goTo(active + 1, true);
 });

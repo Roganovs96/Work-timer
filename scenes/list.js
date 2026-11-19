@@ -6,7 +6,6 @@ window.SCENE_LIST = [
   'batrak',
   'train',
   'map',
-  'shashlik',
   'derby',
   'salary',
   'greenhouse',
