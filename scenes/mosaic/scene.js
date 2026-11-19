@@ -1,8 +1,8 @@
-// Мозаика: 100 000 кубиков-пикселей — это раскраска. Сначала видна только бледная тень картины,
+// Мозаика: 10 000 кубиков — это раскраска. Сначала видна только бледная тень картины,
 // а с ходом рабочего дня кубики закрашиваются и проявляют закат над горами и озером.
 // Цвет растекается органичными пятнами от центра, свежие кубики вспыхивают, по фронту ходит «кисть».
 
-const TOTAL = 100000;
+const TOTAL = 10000;
 const cv = makeCanvas();
 css(`
   .hud { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); pointer-events: none; text-align: center;
@@ -13,7 +13,7 @@ css(`
   .hud .small { font-size: 11.5px; color: #8a90a0; margin-top: 1px; }
   @media (max-width: 500px) { .hud .big { font-size: 15px; } }
 `);
-html('<div class="hud"><div class="big">🎨 <span id="done">0</span><i> из 100 000 кубиков</i></div><div class="small" id="rate"></div></div>');
+html('<div class="hud"><div class="big">🎨 <span id="done">0</span><i> из 10 000 кубиков</i></div><div class="small" id="rate"></div></div>');
 
 const mz = { g: null, k: -1, recent: [] };
 
@@ -62,7 +62,7 @@ function paint(cols, rows) {
 function set(k, force) {
   if (force || !mz.g) {
     const W = area.clientWidth, H = area.clientHeight; if (!W || !H) return;
-    const port = H > W * 1.05, cols = port ? 250 : 400, rows = TOTAL / cols;
+    const port = H > W * 1.05, cols = port ? 80 : 125, rows = TOTAL / cols;
     // порядок: пятна по шуму плюс расстояние от центра — краска растекается органично
     const pr = rng(9), keys = new Float32Array(TOTAL), order = new Uint32Array(TOTAL);
     for (let i = 0; i < TOTAL; i++) {

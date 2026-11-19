@@ -13,7 +13,7 @@ css(`
 `);
 html('<div class="hud">🍎 <b id="eaten">0</b><span> из 200</span> · 🐍 длина <b id="len">3</b></div>');
 
-const sn = { g: null, body: [], prev: [], dir: [1, 0], grow: 0, apples: [], spawned: 0, eaten: 0, acc: 0, last: 0, bursts: [] };
+const sn = { g: null, body: [], oldTail: null, dir: [1, 0], grow: 0, apples: [], spawned: 0, eaten: 0, acc: 0, last: 0, bursts: [] };
 const spawnedAt = p => Math.max(0, Math.min(APPLES, Math.floor(p * 2 + 1e-9)));     // каждые 0,5%
 
 function set(k, force) {
@@ -38,7 +38,7 @@ function reset() {
   const cells = [];
   for (let y = g.rows - 1; y >= 0 && cells.length < len; y--)
     for (let i = 0; i < g.cols && cells.length < len; i++) cells.push([(g.rows - 1 - y) % 2 ? g.cols - 1 - i : i, y]);
-  sn.body = cells.reverse(); sn.prev = sn.body.map(p => p.slice());
+  sn.body = cells.reverse(); sn.oldTail = sn.body[sn.body.length - 1].slice();
   const [hx, hy] = sn.body[0], [nx, ny] = sn.body[1] || [hx - 1, hy];
   sn.dir = [Math.sign(hx - nx) || 1, Math.sign(hy - ny)];
   sn.grow = 0; sn.apples = []; sn.eaten = eaten; sn.spawned = eaten;
@@ -112,14 +112,14 @@ function step() {
       const body = follow([m], sn.grow, appleKeys), ok = tailReachable(body);
       const tailPath = ok && body.length >= 4 ? bfs(m, new Set([key(...body[body.length - 1])]), new Set(body.slice(1, -1).map(p => key(...p)))) : null;
       const straight = m[0] - head[0] === sn.dir[0] && m[1] - head[1] === sn.dir[1];
-      return { m, ok, score: (ok ? 1000 : room(m[0], m[1], walls, 900)) + (tailPath ? tailPath.length : 0) + (straight ? 3 : 0) + Math.random() * (appleKeys.size ? 0.5 : 6) };
+      return { m, ok, score: (ok ? 1000 : room(m[0], m[1], walls, 900)) + (tailPath ? tailPath.length : 0) + (straight ? 6 : 0) + Math.random() * (appleKeys.size ? 0.5 : 2) };
     });
     next = scored.sort((a, b) => (b.ok - a.ok) || (b.score - a.score))[0].m;
   }
   const pick = [next[0], next[1], next[0] - head[0], next[1] - head[1]];
-  sn.prev = sn.body.map(p => p.slice());
   sn.body.unshift([pick[0], pick[1]]); sn.dir = [pick[2], pick[3]];
-  if (sn.grow > 0) { sn.grow--; sn.prev.push(sn.prev[sn.prev.length - 1].slice()); } else sn.body.pop();
+  // хвост: откуда он сейчас подтягивается (если змейка растёт — стоит на месте)
+  if (sn.grow > 0) { sn.grow--; sn.oldTail = sn.body[sn.body.length - 1].slice(); } else sn.oldTail = sn.body.pop();
   const ai = sn.apples.findIndex(a => a.x === pick[0] && a.y === pick[1]);
   if (ai >= 0) { sn.apples.splice(ai, 1); sn.grow++; sn.eaten++; sn.bursts.push({ x: pick[0], y: pick[1], t0: performance.now() }); }
 }
@@ -143,16 +143,20 @@ function frame(now) {
     ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = Math.max(1, c * 0.07); ctx.beginPath(); ctx.moveTo(x, y - s * 0.8); ctx.lineTo(x + s * 0.15, y - s * 1.25); ctx.stroke();
     ctx.fillStyle = '#4caf50'; ctx.beginPath(); ctx.ellipse(x + s * 0.4, y - s * 1.1, s * 0.35, s * 0.16, -0.5, 0, 7); ctx.fill();
   }
-  // змейка: плавно между клетками, от хвоста к голове, цвет перетекает
-  const n = sn.body.length, pos = i => { const a = sn.prev[i] || sn.body[i], b = sn.body[i]; return [ox + (lerp(a[0], b[0], q) + 0.5) * c, oy + (lerp(a[1], b[1], q) + 0.5) * c]; };
+  // змейка: все изгибы стоят ровно в центрах клеток, плавно двигаются только кончик головы и хвоста —
+  // поэтому на поворотах тело не дрожит и не срезает углы
+  const n = sn.body.length, C = p => [ox + (p[0] + 0.5) * c, oy + (p[1] + 0.5) * c], L = (a, b) => [lerp(a[0], b[0], q), lerp(a[1], b[1], q)];
+  const pts = [n > 1 ? C(L(sn.body[1], sn.body[0])) : C(sn.body[0])];
+  for (let i = 1; i < n; i++) pts.push(C(sn.body[i]));
+  pts.push(C(L(sn.oldTail || sn.body[n - 1], sn.body[n - 1])));
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  for (let i = n - 1; i > 0; i--) {
-    const t = i / Math.max(1, n - 1), [x1, y1] = pos(i), [x0, y0] = pos(i - 1);
+  for (let i = pts.length - 1; i > 0; i--) {
+    const t = i / (pts.length - 1);
     ctx.strokeStyle = `hsl(${lerp(150, 95, t)}, 62%, ${lerp(52, 34, t)}%)`; ctx.lineWidth = c * lerp(0.78, 0.5, t);
-    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x0, y0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(...pts[i]); ctx.lineTo(...pts[i - 1]); ctx.stroke();
   }
   // голова с глазами и язычком
-  const [hx, hy] = pos(0), [dx, dy] = sn.dir;
+  const [hx, hy] = pts[0], [dx, dy] = sn.dir;
   ctx.fillStyle = 'hsl(150, 62%, 55%)'; ctx.beginPath(); ctx.arc(hx, hy, c * 0.46, 0, 7); ctx.fill();
   for (const sd of [-1, 1]) {
     const ex = hx + dx * c * 0.14 - dy * sd * c * 0.2, ey = hy + dy * c * 0.14 + dx * sd * c * 0.2;
