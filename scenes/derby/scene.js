@@ -193,4 +193,4 @@ function sub() {
   return [{ t: 'Финальный свисток через ' }, { ms: (100 - p) / 100 * dayLenMs(), b: true }];
 }
 
-registerScene({ name: 'Дерби', author: 'Roganovs96', steps: 100, set, frame, tick, sub });
+registerScene({ name: 'Дерби', icon: '⚽', author: 'Roganovs96', steps: 100, set, frame, tick, sub });

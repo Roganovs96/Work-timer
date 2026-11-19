@@ -249,6 +249,6 @@ function trainSub() {
 }
 
 registerScene({
-  name: 'Поезд', author: 'Roganovs96',
+  name: 'Поезд', icon: '🚆', author: 'Roganovs96',
   set: trainSet, frame: trainFrame, tick: updateTrain, sub: trainSub,
 });

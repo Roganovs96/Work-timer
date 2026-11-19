@@ -170,5 +170,5 @@ function sub() {
   return [{ t: ITEMS[cards.indexOf(next)][0].slice(0, 40) + ' через ' }, { ms, b: true }];
 }
 
-registerScene({ name: 'Зарплата', author: 'Roganovs96', interactive: true, set() {}, frame, tick, sub });
+registerScene({ name: 'Зарплата', icon: '💰', author: 'Roganovs96', interactive: true, set() {}, frame, tick, sub });
 apply(false);

@@ -224,7 +224,7 @@ function crowdFrame(now) {
 }
 
 registerScene({
-  name: 'Стрелок', author: 'Roganovs96',
+  name: 'Стрелок', icon: '🎯', author: 'Roganovs96',
   words: ['выстрел', 'каждые', 'следующий выстрел', 'следующий'],
   set: drawCrowd, frame: crowdFrame,
   // «уйти пораньше»: вся очередь отстреливается за ~5 секунд
